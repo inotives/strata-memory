@@ -16,5 +16,6 @@ Core commands are installed under `0_core/script/`.
 | `link-review.sh` | Report invalid and broken Markdown links. |
 | `promote.sh` | Promote a draft into a durable tier and archive the source draft. |
 | `agents-generate.sh` | Generate root `AGENTS.md` while preserving manual sections. |
+| `retention.sh` | Report or delete expired archived drafts. |
 
 Additional MVP commands will be added as implementation phases land.

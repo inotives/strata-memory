@@ -24,6 +24,20 @@ strata_config_allowed_tags() {
     ' "$(strata_config_path)"
 }
 
+strata_config_retention_archived_drafts_days() {
+    awk '
+    /^retention:/ { in_retention = 1; next }
+    in_retention && /^[^ ]/ { exit }
+    in_retention && /^[ ]+archived_drafts_days:/ {
+      value = $0
+      sub(/^.*archived_drafts_days:[ ]*/, "", value)
+      gsub(/^"|"$/, "", value)
+      print value
+      exit
+    }
+    ' "$(strata_config_path)"
+}
+
 strata_config_room_patterns() {
     awk '
     /^rooms:/ { in_rooms = 1; next }
