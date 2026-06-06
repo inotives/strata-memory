@@ -17,5 +17,6 @@ Core commands are installed under `0_core/script/`.
 | `promote.sh` | Promote a draft into a durable tier and archive the source draft. |
 | `agents-generate.sh` | Generate root `AGENTS.md` while preserving manual sections. |
 | `retention.sh` | Report or delete expired archived drafts. |
+| `privacy-review.sh` | Warn about private-data patterns before committing or sharing a vault. |
 
 Additional MVP commands will be added as implementation phases land.
