@@ -18,5 +18,6 @@ Core commands are installed under `0_core/script/`.
 | `agents-generate.sh` | Generate root `AGENTS.md` while preserving manual sections. |
 | `retention.sh` | Report or delete expired archived drafts. |
 | `privacy-review.sh` | Warn about private-data patterns before committing or sharing a vault. |
+| `migration.sh` | Migrate selected legacy Agent Memory sections into a Strata vault. |
 
 Additional MVP commands will be added as implementation phases land.
