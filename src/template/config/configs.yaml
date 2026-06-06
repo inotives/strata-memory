@@ -65,6 +65,14 @@ rooms:
       allowed_status:
         - verified
         - archived
+    - path: "entity/tool/*"
+      description: "Tool-specific knowledge."
+      depth: "recursive"
+      required_files:
+        - "_meta.md"
+      allowed_status:
+        - verified
+        - archived
     - path: "entity/stock/*"
       description: "Stock-specific knowledge keyed by lowercase ticker paths."
       depth: "recursive"
