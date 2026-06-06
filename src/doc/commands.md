@@ -13,5 +13,6 @@ Core commands are installed under `0_core/script/`.
 | `room-review.sh` | Report files outside registered room patterns. |
 | `link-review.sh` | Report invalid and broken Markdown links. |
 | `promote.sh` | Promote a draft into a durable tier and archive the source draft. |
+| `agents-generate.sh` | Generate root `AGENTS.md` while preserving manual sections. |
 
 Additional MVP commands will be added as implementation phases land.

@@ -37,3 +37,33 @@ strata_config_room_patterns() {
     }
     ' "$(strata_config_path)"
 }
+
+strata_config_profile() {
+    awk '
+    /^profile:/ {
+      value = $0
+      sub(/^profile:[ ]*/, "", value)
+      gsub(/^"|"$/, "", value)
+      print value
+      exit
+    }
+    ' "$(strata_config_path)"
+}
+
+strata_config_profile_tier2_rooms() {
+    local profile=$1
+    awk -v profile="$profile" '
+    /^profiles:/ { in_profiles = 1; next }
+    in_profiles && $0 ~ "^[ ][ ]" profile ":" { in_profile = 1; next }
+    in_profile && /^[ ][ ][a-zA-Z0-9_-]+:/ && $0 !~ "^[ ][ ]" profile ":" { exit }
+    in_profile && /^[ ][ ][ ][ ]tier2_rooms:/ { in_rooms = 1; next }
+    in_rooms && /^[ ][ ][ ][ ][ ][ ]-[ ]+/ {
+      value = $0
+      sub(/^[ ]+-[ ]+/, "", value)
+      gsub(/^"|"$/, "", value)
+      print value
+      next
+    }
+    in_rooms && /^[ ][ ][ ][ ][^ ]/ { exit }
+    ' "$(strata_config_path)"
+}
