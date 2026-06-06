@@ -1,0 +1,143 @@
+profile: "coder"
+
+retention:
+  archived_drafts_days: 180
+  default_mode: "report"
+
+tags:
+  allowed:
+    - agent
+    - memory
+    - research
+    - skill
+    - workflow
+
+rooms:
+  1_draft:
+    - path: "research"
+      description: "Unverified research drafts awaiting review."
+      depth: "recursive"
+      allowed_status:
+        - pending
+        - archived
+    - path: "note"
+      description: "Ad-hoc draft notes."
+      depth: "recursive"
+      allowed_status:
+        - pending
+        - archived
+    - path: "skill"
+      description: "Draft skill material."
+      depth: "recursive"
+      allowed_status:
+        - pending
+        - archived
+    - path: "agent"
+      description: "Draft agent persona material."
+      depth: "recursive"
+      allowed_status:
+        - pending
+        - archived
+    - path: "workflow"
+      description: "Draft workflow material."
+      depth: "recursive"
+      allowed_status:
+        - pending
+        - archived
+    - path: "session"
+      description: "Raw session captures."
+      depth: "recursive"
+      allowed_status:
+        - pending
+        - archived
+  2_knowledge:
+    - path: "concept"
+      description: "Foundational ideas, definitions, principles, patterns, frameworks."
+      depth: "recursive"
+      allowed_status:
+        - verified
+        - archived
+    - path: "entity/project/*"
+      description: "Project-specific knowledge."
+      depth: "recursive"
+      required_files:
+        - "_meta.md"
+      allowed_status:
+        - verified
+        - archived
+    - path: "entity/stock/*"
+      description: "Stock-specific knowledge keyed by lowercase ticker paths."
+      depth: "recursive"
+      required_files:
+        - "_meta.md"
+      allowed_status:
+        - verified
+        - archived
+    - path: "entity/cryptocurrency/*"
+      description: "Cryptocurrency-specific knowledge keyed by lowercase symbol paths."
+      depth: "recursive"
+      required_files:
+        - "_meta.md"
+      allowed_status:
+        - verified
+        - archived
+    - path: "research"
+      description: "Reviewed research."
+      depth: "recursive"
+      allowed_status:
+        - verified
+        - archived
+    - path: "note"
+      description: "Curated notes."
+      depth: "recursive"
+      allowed_status:
+        - verified
+        - archived
+    - path: "preference"
+      description: "Stable user preferences."
+      depth: "recursive"
+      allowed_status:
+        - verified
+        - archived
+  3_intelligence:
+    - path: "skill"
+      description: "Reusable capability bundles."
+      depth: "recursive"
+      allowed_status:
+        - verified
+        - archived
+    - path: "agent"
+      description: "Agent persona definitions."
+      depth: "recursive"
+      allowed_status:
+        - verified
+        - archived
+    - path: "workflow"
+      description: "Operational workflows."
+      depth: "recursive"
+      allowed_status:
+        - verified
+        - archived
+    - path: "report"
+      description: "Generated reports."
+      depth: "recursive"
+      allowed_status:
+        - generated
+
+profiles:
+  coder:
+    tier2_rooms:
+      - "concept"
+      - "entity/project/*"
+      - "entity/tool/*"
+      - "research"
+      - "note"
+      - "preference"
+  trader:
+    tier2_rooms:
+      - "concept"
+      - "entity/stock/*"
+      - "entity/cryptocurrency/*"
+      - "research"
+      - "note"
+      - "preference"

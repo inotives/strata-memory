@@ -1,0 +1,6 @@
+0_core/db/strata.db
+0_core/cache/
+0_core/tmp/
+0_core/test/tmp/
+3_intelligence/report/scratch/
+3_intelligence/report/debug/
