@@ -16,6 +16,10 @@ strata_db_path() {
     printf '%s/db/strata.db\n' "$(strata_core)"
 }
 
+strata_config_cache_path() {
+    printf '%s/cache/config.compiled.json\n' "$(strata_core)"
+}
+
 strata_migrations_dir() {
     printf '%s/db/migrations\n' "$(strata_core)"
 }
