@@ -5,6 +5,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 TMP_ROOT="${ROOT}/test/tmp"
 mkdir -p "$TMP_ROOT"
 VAULT=$(mktemp -d "${TMP_ROOT}/normalize-test-XXXXXXXX")
+trap 'rm -rf "$VAULT"' EXIT HUP INT TERM
 
 fail() {
     printf 'not ok - %s\n' "$1" >&2

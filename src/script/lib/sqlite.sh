@@ -42,6 +42,12 @@ strata_sqlite_exec() {
     "$(strata_sqlite_bin)" "$db" "$sql"
 }
 
+strata_sqlite_quote() {
+    printf "'"
+    printf '%s' "$1" | sed "s/'/''/g"
+    printf "'"
+}
+
 strata_sqlite_has_migration() {
     local db=$1
     local version=$2

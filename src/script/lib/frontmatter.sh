@@ -104,3 +104,53 @@ strata_extract_body() {
     NR == 1 && $0 != "---" { body = 1 }
     ' "$file"
 }
+
+strata_extract_array_json() {
+    local file=$1
+    local key=$2
+
+    awk -v key="$key" '
+    function trim(s) {
+      sub(/^[ \t]*/, "", s)
+      sub(/[ \t]*$/, "", s)
+      return s
+    }
+    function emit_value(v) {
+      v = trim(v)
+      if (v ~ /^".*"$/) {
+        v = substr(v, 2, length(v) - 2)
+      }
+      gsub(/\\/,"\\\\",v)
+      gsub(/"/,"\\\"",v)
+      if (count > 0) {
+        printf ","
+      }
+      printf "\"%s\"", v
+      count++
+    }
+    NR == 1 && $0 == "---" { in_fm = 1; next }
+    in_fm && $0 == "---" { exit }
+    in_fm {
+      prefix = key ":"
+      if (index($0, prefix) == 1) {
+        found = 1
+        next
+      }
+      if (found) {
+        if ($0 ~ /^[ ][ ]-/ || $0 ~ /^\t-/) {
+          line = $0
+          sub(/^[ \t]*-[ \t]*/, "", line)
+          emit_value(line)
+          next
+        }
+        if ($0 ~ /^[ \t]*$/) {
+          next
+        }
+        exit
+      }
+    }
+    END {
+      printf "\n"
+    }
+    ' "$file" | awk '{ printf "[%s]", $0 }'
+}
