@@ -11,7 +11,8 @@
 <p align="center">
   <a href="License.md"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-white?style=for-the-badge&labelColor=000000"></a>
   <a href="docs/project_spec.md"><img alt="Status: implementation" src="https://img.shields.io/badge/status-implementation-white?style=for-the-badge&labelColor=000000"></a>
-  <img alt="Runtime: Bash 3.2" src="https://img.shields.io/badge/runtime-bash%203.2-white?style=for-the-badge&labelColor=000000">
+  <img alt="Runtime: Rust CLI" src="https://img.shields.io/badge/runtime-rust%20cli-white?style=for-the-badge&labelColor=000000">
+  <img alt="Shell: wrappers" src="https://img.shields.io/badge/shell-wrappers-white?style=for-the-badge&labelColor=000000">
   <img alt="Index: SQLite FTS5" src="https://img.shields.io/badge/index-sqlite%20fts5-white?style=for-the-badge&labelColor=000000">
 </p>
 
@@ -31,7 +32,7 @@
 
 Strata-Memory is a local-first memory system for agentic work. Markdown files are canonical. SQLite is a rebuildable derived index for search, metadata queries, link review, and retrieval workflows.
 
-This repository is the public engine repo. It contains the installer, scripts, templates, tests, and documentation for installing Strata into a private vault.
+This repository is the public engine repo. It contains the Rust CLI, installer, shell wrappers, templates, tests, and documentation for installing Strata into a private vault.
 
 By default, the private vault lives at:
 
@@ -44,7 +45,7 @@ By default, the private vault lives at:
 Strata uses a core-plus-three-tier lifecycle:
 
 ```text
-0_core/          # installed engine kernel, scripts, templates, config, cache, db
+0_core/          # installed engine kernel, Rust binary, wrappers, templates, config, cache, db
 1_draft/         # raw, unreviewed material
 2_knowledge/     # curated durable knowledge
 3_intelligence/  # skills, agents, workflows, reports
@@ -54,10 +55,16 @@ The public repo should not contain vault-runtime folders at its root. Engine sou
 
 ## Dependencies
 
-Bootstrap commands require:
+Primary runtime:
 
 ```text
-bash sqlite3 awk sed find sort mktemp cksum date
+rust cargo sqlite3
+```
+
+Shell wrappers and remaining Bash fallback commands require:
+
+```text
+bash awk sed find sort mktemp cksum date
 ```
 
 Full-mode configuration compilation requires:
@@ -69,22 +76,24 @@ jq yq
 Strata-Memory does not auto-install dependencies. On Debian/Ubuntu-like systems:
 
 ```bash
-sudo apt install bash sqlite3 gawk sed findutils coreutils jq yq
+sudo apt install cargo rustc sqlite3 bash gawk sed findutils coreutils jq yq
 ```
 
 SQLite should support FTS5 for full search indexing. The database scripts detect FTS5 support and record migration `002` only when available.
 
 ## Install
 
-Install into the default vault:
+Build the Rust CLI, then install into the default vault:
 
 ```bash
+cargo build --manifest-path src/rust/strata/Cargo.toml --release
 ./install.sh
 ```
 
 Install into a custom vault:
 
 ```bash
+cargo build --manifest-path src/rust/strata/Cargo.toml --release
 ./install.sh --vault /path/to/vault
 ```
 
@@ -98,7 +107,7 @@ The installer:
 
 - initializes the vault structure
 - copies managed engine files into `0_core/script`, `0_core/db`, `0_core/doc`, and `0_core/template`
-- copies a built Rust CLI into `0_core/bin/strata` when `src/rust/strata/target/release/strata` exists
+- copies the built Rust CLI into `0_core/bin/strata` when `src/rust/strata/target/release/strata` exists
 - preserves existing `0_core/config/configs.yaml`
 - creates `.gitignore` and `AGENTS.md` only when missing
 - writes `0_core/manifest.json`
@@ -110,46 +119,46 @@ After install, run:
 ~/.strata-memory/0_core/script/doctor.sh --vault ~/.strata-memory
 ```
 
-## Optional Rust Indexer
+## Rust CLI
 
-Phase 4a adds an optional Rust CLI behind the existing Bash command contract. It is not required for install. Build it before running `install.sh` when you want the installed `index.sh` wrapper to delegate indexing to Rust:
-
-```bash
-cargo build --manifest-path src/rust/strata/Cargo.toml --release
-./install.sh --vault ~/.strata-memory
-```
-
-Installed shape:
+The primary engine is the installed Rust binary:
 
 ```text
 ~/.strata-memory/0_core/bin/strata
-~/.strata-memory/0_core/script/index.sh
 ```
 
-`index.sh`, `search.sh`, and `link-review.sh` keep the public command stable and delegate to `0_core/bin/strata` only when that binary exists. Set `STRATA_INDEX_BASH_FALLBACK=1`, `STRATA_SEARCH_BASH_FALLBACK=1`, or `STRATA_LINK_REVIEW_BASH_FALLBACK=1` to force the Bash implementation for a command.
+Current Rust-backed commands:
+
+```text
+strata index [--target FILE | --full] --vault PATH [--json]
+strata search --query TEXT --vault PATH [--limit N] [--include-archived] [--paths-only] [--json]
+strata link-review --vault PATH [--json]
+```
+
+The installed shell scripts remain stable wrappers for existing user workflows. `index.sh`, `search.sh`, and `link-review.sh` delegate to `0_core/bin/strata` when present. Set `STRATA_INDEX_BASH_FALLBACK=1`, `STRATA_SEARCH_BASH_FALLBACK=1`, or `STRATA_LINK_REVIEW_BASH_FALLBACK=1` to force the Bash fallback for that command.
 
 Rust full indexing reports progress on stderr when run interactively. For non-interactive runs, set `STRATA_INDEX_PROGRESS_EVERY=N` to print progress every N scanned files, or `0` to disable progress.
 
 ## Common Commands
 
-Run all commands from the installed vault scripts. Most commands accept `--vault PATH`; most review commands also accept `--json`.
+Use the installed Rust CLI for Rust-backed commands. Shell wrappers remain for commands that have not moved to Rust yet.
 
 | Command | Purpose |
 |---|---|
-| `init.sh --vault PATH` | Create the vault directory layout. |
-| `db-migrate.sh --vault PATH [--json]` | Create or update the derived SQLite schema. |
-| `index.sh [--target FILE | --full] --vault PATH [--json]` | Index Markdown files into SQLite. |
-| `search.sh --query TEXT --vault PATH [--limit N] [--include-archived] [--paths-only] [--json]` | Search indexed memory with SQLite FTS5. |
-| `normalize.sh --target FILE [--vault PATH] [--check] [--json]` | Normalize constrained Markdown frontmatter. |
-| `promote.sh --source FILE --to ROOM [--slug NAME] [--vault PATH] [--json]` | Promote a draft into a durable tier and archive the original. |
-| `doctor.sh --vault PATH [--json]` | Check vault health without mutating files. |
-| `tag-review.sh --vault PATH [--json]` | Review frontmatter tags against allowed tags. |
-| `room-review.sh --vault PATH [--json]` | Report files outside registered room patterns. |
-| `link-review.sh --vault PATH [--json]` | Review local Markdown links. Broken durable links are blocking errors. |
-| `privacy-review.sh --vault PATH [--json]` | Report local-path and privacy warnings. |
-| `config-compile.sh --vault PATH [--json]` | Validate config and write `0_core/cache/config.compiled.json`. Requires `jq` and `yq`. |
-| `agents-generate.sh --vault PATH [--json]` | Generate vault `AGENTS.md` while preserving manual sections. |
-| `retention.sh --vault PATH [--apply] [--json]` | Report or delete archived drafts past retention policy. |
+| `strata index [--target FILE \| --full] --vault PATH [--json]` | Index Markdown files into SQLite. |
+| `strata search --query TEXT --vault PATH [--limit N] [--include-archived] [--paths-only] [--json]` | Search indexed memory with SQLite FTS5. |
+| `strata link-review --vault PATH [--json]` | Review local Markdown links. Broken durable links are blocking errors. |
+| `0_core/script/init.sh --vault PATH` | Create the vault directory layout. Shell wrapper. |
+| `0_core/script/db-migrate.sh --vault PATH [--json]` | Create or update the derived SQLite schema. Shell wrapper. |
+| `0_core/script/normalize.sh --target FILE [--vault PATH] [--check] [--json]` | Normalize constrained Markdown frontmatter. Shell wrapper. |
+| `0_core/script/promote.sh --source FILE --to ROOM [--slug NAME] [--vault PATH] [--json]` | Promote a draft into a durable tier and archive the original. Shell wrapper. |
+| `0_core/script/doctor.sh --vault PATH [--json]` | Check vault health without mutating files. Shell wrapper. |
+| `0_core/script/tag-review.sh --vault PATH [--json]` | Review frontmatter tags against allowed tags. Shell wrapper. |
+| `0_core/script/room-review.sh --vault PATH [--json]` | Report files outside registered room patterns. Shell wrapper. |
+| `0_core/script/privacy-review.sh --vault PATH [--json]` | Report local-path and privacy warnings. Shell wrapper. |
+| `0_core/script/config-compile.sh --vault PATH [--json]` | Validate config and write `0_core/cache/config.compiled.json`. Requires `jq` and `yq`. Shell wrapper. |
+| `0_core/script/agents-generate.sh --vault PATH [--json]` | Generate vault `AGENTS.md` while preserving manual sections. Shell wrapper. |
+| `0_core/script/retention.sh --vault PATH [--apply] [--json]` | Report or delete archived drafts past retention policy. Shell wrapper. |
 
 ## Draft Templates
 
