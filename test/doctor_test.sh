@@ -29,6 +29,7 @@ out=$("${VAULT}/0_core/script/doctor.sh" --vault "$VAULT" --json)
 assert_contains "$out" '"ok":true'
 assert_contains "$out" '"name":"migration_001"'
 assert_contains "$out" '"name":"tag_review"'
+assert_contains "$out" '"name":"db_writable"'
 assert_contains "$out" '"name":"agents"'
 
 mkdir -p "${VAULT}/2_knowledge/research"

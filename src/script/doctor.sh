@@ -56,6 +56,23 @@ run_capture() {
     "$@" > "$output" 2>&1
 }
 
+check_writable_dir() {
+    local dir=$1
+    local name=$2
+    local probe
+
+    if [ ! -d "$dir" ]; then
+        return 0
+    fi
+
+    if probe=$(mktemp "${dir}/.doctor-write-XXXXXXXX" 2>/dev/null); then
+        rm -f "$probe"
+        record pass "$name" "$(strata_rel_path "$dir" "$vault") is writable"
+    else
+        record error "$name" "$(strata_rel_path "$dir" "$vault") is not writable; check filesystem mount state before SQLite rebuilds"
+    fi
+}
+
 if strata_check_bootstrap_dependencies > "${tmp_dir}/doctor-bootstrap.out" 2>&1; then
     record pass bootstrap_dependencies "bootstrap dependencies are available"
 else
@@ -87,6 +104,9 @@ do
         record error directory "$(strata_rel_path "$dir" "$vault") is missing"
     fi
 done
+
+check_writable_dir "$tmp_dir" tmp_writable
+check_writable_dir "$core/db" db_writable
 
 if strata_config_exists; then
     record pass config "0_core/config/configs.yaml exists"

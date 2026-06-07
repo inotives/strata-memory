@@ -73,6 +73,14 @@ rooms:
       allowed_status:
         - verified
         - archived
+    - path: "entity/company/*"
+      description: "Company-specific knowledge keyed by lowercase company paths."
+      depth: "recursive"
+      required_files:
+        - "_meta.md"
+      allowed_status:
+        - verified
+        - archived
     - path: "entity/stock/*"
       description: "Stock-specific knowledge keyed by lowercase ticker paths."
       depth: "recursive"
@@ -138,12 +146,14 @@ profiles:
       - "concept"
       - "entity/project/*"
       - "entity/tool/*"
+      - "entity/company/*"
       - "research"
       - "note"
       - "preference"
   trader:
     tier2_rooms:
       - "concept"
+      - "entity/company/*"
       - "entity/stock/*"
       - "entity/cryptocurrency/*"
       - "research"
