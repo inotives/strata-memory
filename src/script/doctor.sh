@@ -154,6 +154,32 @@ else
     record error database "0_core/db/strata.db is missing; run db-migrate.sh"
 fi
 
+status_out=$(mktemp "${tmp_dir}/doctor-status-XXXXXXXX")
+find "$vault/1_draft" "$vault/2_knowledge" "$vault/3_intelligence" -type f -name '*.md' 2>/dev/null | while IFS= read -r file; do
+    awk -v file="$file" '
+    NR == 1 && $0 == "---" { in_fm = 1; next }
+    in_fm && $0 == "---" { exit }
+    in_fm && index($0, "status:") == 1 {
+      value = substr($0, length("status:") + 1)
+      sub(/^[ \t]*/, "", value)
+      sub(/[ \t]*$/, "", value)
+      if (value ~ /^".*"$/) {
+        value = substr(value, 2, length(value) - 2)
+      }
+      if (value != "pending" && value != "verified" && value != "archived" && value != "generated" && value != "core") {
+        printf "%s:%d:%s\n", file, NR, value
+      }
+      exit
+    }' "$file"
+done > "$status_out"
+status_count=$(awk 'END { print NR + 0 }' "$status_out")
+if [ "$status_count" = "0" ]; then
+    record pass status_review "all frontmatter statuses are valid"
+else
+    record error status_review "${status_count} invalid frontmatter statuses found"
+fi
+rm -f "$status_out"
+
 review_out=$(mktemp "${tmp_dir}/doctor-review-XXXXXXXX")
 if run_capture "$review_out" "${SCRIPT_DIR}/tag-review.sh" --vault "$vault" --json; then
     tag_count=$(sed -n 's/^.*"unknown_count":\([0-9][0-9]*\).*$/\1/p' "$review_out")

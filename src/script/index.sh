@@ -71,6 +71,21 @@ vault=$(strata_vault)
 db=$(strata_db_path)
 sqlite_bin=$(strata_sqlite_bin)
 
+rust_bin="${vault}/0_core/bin/strata"
+if [ "${STRATA_INDEX_BASH_FALLBACK:-}" != "1" ] && [ -x "$rust_bin" ]; then
+    args=(index --vault "$vault")
+    if [ "$full" = true ]; then
+        args+=(--full)
+    fi
+    if [ -n "$target" ]; then
+        args+=(--target "$target")
+    fi
+    if [ "$json" = true ]; then
+        args+=(--json)
+    fi
+    exec "$rust_bin" "${args[@]}"
+fi
+
 "${SCRIPT_DIR}/db-migrate.sh" --vault "$vault" >/dev/null
 
 indexed=0
@@ -133,6 +148,13 @@ index_one() {
             *) status=$(strata_default_status "$strata" "$rel") ;;
         esac
     fi
+    case "$status" in
+        pending|verified|archived|generated|core) ;;
+        *)
+            strata_log_error "invalid status for ${rel}: ${status}"
+            exit 1
+            ;;
+    esac
 
     id=$(strata_extract_scalar "$abs" id)
     [ -n "$id" ] || id=$(strata_make_id "$rel")

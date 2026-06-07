@@ -98,6 +98,7 @@ The installer:
 
 - initializes the vault structure
 - copies managed engine files into `0_core/script`, `0_core/db`, `0_core/doc`, and `0_core/template`
+- copies a built Rust CLI into `0_core/bin/strata` when `src/rust/strata/target/release/strata` exists
 - preserves existing `0_core/config/configs.yaml`
 - creates `.gitignore` and `AGENTS.md` only when missing
 - writes `0_core/manifest.json`
@@ -108,6 +109,26 @@ After install, run:
 ~/.strata-memory/0_core/script/db-migrate.sh --vault ~/.strata-memory
 ~/.strata-memory/0_core/script/doctor.sh --vault ~/.strata-memory
 ```
+
+## Optional Rust Indexer
+
+Phase 4a adds an optional Rust CLI behind the existing Bash command contract. It is not required for install. Build it before running `install.sh` when you want the installed `index.sh` wrapper to delegate indexing to Rust:
+
+```bash
+cargo build --manifest-path src/rust/strata/Cargo.toml --release
+./install.sh --vault ~/.strata-memory
+```
+
+Installed shape:
+
+```text
+~/.strata-memory/0_core/bin/strata
+~/.strata-memory/0_core/script/index.sh
+```
+
+`index.sh`, `search.sh`, and `link-review.sh` keep the public command stable and delegate to `0_core/bin/strata` only when that binary exists. Set `STRATA_INDEX_BASH_FALLBACK=1`, `STRATA_SEARCH_BASH_FALLBACK=1`, or `STRATA_LINK_REVIEW_BASH_FALLBACK=1` to force the Bash implementation for a command.
+
+Rust full indexing reports progress on stderr when run interactively. For non-interactive runs, set `STRATA_INDEX_PROGRESS_EVERY=N` to print progress every N scanned files, or `0` to disable progress.
 
 ## Common Commands
 

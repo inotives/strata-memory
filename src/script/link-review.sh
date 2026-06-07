@@ -30,6 +30,16 @@ while [ "$#" -gt 0 ]; do
 done
 
 vault=$(strata_vault)
+
+rust_bin="${vault}/0_core/bin/strata"
+if [ "${STRATA_LINK_REVIEW_BASH_FALLBACK:-}" != "1" ] && [ -x "$rust_bin" ]; then
+    args=(link-review --vault "$vault")
+    if [ "$json" = true ]; then
+        args+=(--json)
+    fi
+    exec "$rust_bin" "${args[@]}"
+fi
+
 issues_tmp=$(mktemp "${vault}/0_core/tmp/link-issues-XXXXXXXX")
 trap 'rm -f "$issues_tmp"' EXIT HUP INT TERM
 : > "$issues_tmp"
