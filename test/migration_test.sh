@@ -34,6 +34,8 @@ snapshot_old() {
 
 mkdir -p \
     "$OLD/2_knowledges/Concepts" \
+    "$OLD/2_knowledges/Notes" \
+    "$OLD/2_knowledges/News" \
     "$OLD/2_knowledges/Sources" \
     "$OLD/2_knowledges/Entities/Stocks/AAPL/Daily" \
     "$OLD/1_drafts/Sessions" \
@@ -63,6 +65,18 @@ cat > "$OLD/2_knowledges/Sources/Raw Source.md" <<'EOF'
 # Raw Source
 EOF
 
+cat > "$OLD/2_knowledges/Notes/Human Note.md" <<'EOF'
+# Human Note
+
+No frontmatter or tags, manually added.
+EOF
+
+cat > "$OLD/2_knowledges/News/Market Update.md" <<'EOF'
+# Market Update
+
+Loose human news capture without tags.
+EOF
+
 cat > "$OLD/1_drafts/Sessions/Skip Me.md" <<'EOF'
 # Skip Me
 EOF
@@ -83,12 +97,14 @@ after=$(snapshot_old)
 [ "$before" = "$after" ] || fail "old memory changed during migration"
 
 case "$out" in
-    *'"ok":true'*'"written_count":3'*'"skipped_count":1'*) ;;
+    *'"ok":true'*'"written_count":5'*'"skipped_count":1'*) ;;
     *) fail "unexpected knowledge migration output: $out" ;;
 esac
 
 assert_file "$VAULT/2_knowledge/concept/alpha-note.md"
+assert_file "$VAULT/2_knowledge/note/human-note.md"
 assert_file "$VAULT/2_knowledge/entity/stock/aapl/daily/daily-plan.md"
+assert_file "$VAULT/2_knowledge/_unmapped/news/market-update.md"
 assert_file "$VAULT/2_knowledge/_unmapped/sources/raw-source.md"
 assert_missing "$VAULT/1_draft/session/skip-me.md"
 assert_contains "$VAULT/2_knowledge/concept/alpha-note.md" "[Daily Plan]"
@@ -102,7 +118,7 @@ assert_contains "$report" '"kind":"rewritten"'
 
 rerun=$("${VAULT}/0_core/script/migration.sh" --from "$OLD" --to "$VAULT" --section knowledge --json)
 case "$rerun" in
-    *'"written_count":0'*'"existing_count":3'*) ;;
+    *'"written_count":0'*'"existing_count":5'*) ;;
     *) fail "expected idempotent rerun, got: $rerun" ;;
 esac
 

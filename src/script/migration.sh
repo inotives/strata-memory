@@ -83,12 +83,12 @@ trap 'rm -f "$plan_tmp" "$map_tmp" "$records_tmp"; rm -rf "$content_dir"' EXIT H
 : > "$records_tmp"
 
 slugify_path() {
-    printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[ _]+/-/g; s/[^a-z0-9.*_\/-]/-/g; s/-\{2,\}/-/g; s#/\{2,\}#/#g; s#^\./##'
+    printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[ _][ _]*/-/g; s/[^a-z0-9.*_\/-]/-/g; s/-\{2,\}/-/g; s#/\{2,\}#/#g; s#^\./##'
 }
 
 map_component() {
     local component
-    component=$(slugify_path "$1")
+    component=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
     case "$component" in
         2_knowledges) printf '%s\n' "2_knowledge" ;;
         3_intelligences) printf '%s\n' "3_intelligence" ;;
@@ -105,8 +105,9 @@ map_component() {
         agents) printf '%s\n' "agent" ;;
         workflows) printf '%s\n' "workflow" ;;
         reports) printf '%s\n' "report" ;;
-        sources) printf '%s\n' "_unmapped/sources" ;;
-        *) printf '%s\n' "$component" ;;
+        news) printf '%s\n' "_unmapped/news" ;;
+        source|sources) printf '%s\n' "_unmapped/sources" ;;
+        *) slugify_path "$1" ;;
     esac
 }
 
