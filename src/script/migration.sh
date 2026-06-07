@@ -353,6 +353,90 @@ rewrite_links() {
     done
 }
 
+legacy_entity_display_value() {
+    local old_rel=$1
+    awk -v rel="$old_rel" '
+    BEGIN {
+      n = split(rel, parts, "/")
+      for (i = 1; i <= n; i++) lower[i] = tolower(parts[i])
+      for (i = 1; i <= n; i++) {
+        if (lower[i] == "stocks" || lower[i] == "cryptocurrencies" || lower[i] == "cryptos" || lower[i] == "companies") {
+          if (i + 1 <= n) print parts[i + 1]
+          exit
+        }
+      }
+    }'
+}
+
+legacy_entity_display_key() {
+    local old_rel=$1
+    awk -v rel="$old_rel" '
+    BEGIN {
+      n = split(rel, parts, "/")
+      for (i = 1; i <= n; i++) {
+        bucket = tolower(parts[i])
+        if (bucket == "stocks") { print "ticker"; exit }
+        if (bucket == "cryptocurrencies" || bucket == "cryptos") { print "symbol"; exit }
+        if (bucket == "companies") { print "display_name"; exit }
+      }
+    }'
+}
+
+content_has_frontmatter_key() {
+    local file=$1
+    local key=$2
+    awk -v key="$key" '
+    NR == 1 && $0 == "---" { in_fm = 1; next }
+    in_fm && $0 == "---" { exit }
+    in_fm && index($0, key ":") == 1 { found = 1; exit }
+    END { exit found ? 0 : 1 }
+    ' "$file"
+}
+
+inject_display_metadata() {
+    local content=$1
+    local old_rel=$2
+    local new_rel=$3
+    local key
+    local value
+    local tmp
+
+    case "$new_rel" in
+        2_knowledge/entity/company/*|2_knowledge/entity/stock/*|2_knowledge/entity/cryptocurrency/*) ;;
+        *) return 0 ;;
+    esac
+
+    key=$(legacy_entity_display_key "$old_rel")
+    value=$(legacy_entity_display_value "$old_rel")
+    [ -n "$key" ] || return 0
+    [ -n "$value" ] || return 0
+
+    if content_has_frontmatter_key "$content" "$key"; then
+        return 0
+    fi
+
+    tmp="${content}.metadata"
+    if awk 'NR == 1 && $0 == "---" { found = 1 } END { exit found ? 0 : 1 }' "$content"; then
+        awk -v key="$key" -v value="$value" '
+        NR == 1 && $0 == "---" {
+          print
+          printf "%s: \"%s\"\n", key, value
+          next
+        }
+        { print }
+        ' "$content" > "$tmp"
+    else
+        {
+            printf '%s\n' '---'
+            printf '%s: "%s"\n' "$key" "$value"
+            printf '%s\n' '---'
+            sed -n '1,$p' "$content"
+        } > "$tmp"
+    fi
+    mv "$tmp" "$content"
+    record metadata "$old_rel" "$new_rel" "${key} preserved as ${value}"
+}
+
 candidate_count=0
 existing_count=0
 written_count=0
@@ -362,6 +446,7 @@ while IFS="$(printf '\t')" read -r old_abs old_rel new_rel; do
     candidate_count=$((candidate_count + 1))
     content="$content_dir/$candidate_count"
     rewrite_links "$old_abs" "$old_rel" "$new_rel" "$content"
+    inject_display_metadata "$content" "$old_rel" "$new_rel"
 
     target="$to/$new_rel"
     if [ -f "$target" ]; then
@@ -398,6 +483,7 @@ unmapped_count=$(awk -F '\t' '$1 == "unmapped" { count++ } END { print count + 0
 skipped_count=$(awk -F '\t' '$1 == "skipped" { count++ } END { print count + 0 }' "$records_tmp")
 rewritten_count=$(awk -F '\t' '$1 == "rewritten" { count++ } END { print count + 0 }' "$records_tmp")
 warning_count=$(awk -F '\t' '$1 == "warning" { count++ } END { print count + 0 }' "$records_tmp")
+metadata_count=$(awk -F '\t' '$1 == "metadata" { count++ } END { print count + 0 }' "$records_tmp")
 
 {
     printf '{\n'
@@ -406,6 +492,7 @@ warning_count=$(awk -F '\t' '$1 == "warning" { count++ } END { print count + 0 }
     printf '  "section": '; strata_json_string "$section_name"; printf ',\n'
     printf '  "from": '; strata_json_string "$from"; printf ',\n'
     printf '  "to": '; strata_json_string "$to"; printf ',\n'
+    printf '  "source_mode": "read-only",\n'
     printf '  "candidate_count": %s,\n' "$candidate_count"
     printf '  "written_count": %s,\n' "$written_count"
     printf '  "existing_count": %s,\n' "$existing_count"
@@ -413,6 +500,7 @@ warning_count=$(awk -F '\t' '$1 == "warning" { count++ } END { print count + 0 }
     printf '  "unmapped_count": %s,\n' "$unmapped_count"
     printf '  "skipped_count": %s,\n' "$skipped_count"
     printf '  "rewritten_count": %s,\n' "$rewritten_count"
+    printf '  "metadata_count": %s,\n' "$metadata_count"
     printf '  "warning_count": %s,\n' "$warning_count"
     printf '  "records": [\n'
     first=true

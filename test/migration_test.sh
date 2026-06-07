@@ -34,6 +34,8 @@ snapshot_old() {
 
 mkdir -p \
     "$OLD/2_knowledges/Concepts" \
+    "$OLD/2_knowledges/Researches/One" \
+    "$OLD/2_knowledges/Researches/Two" \
     "$OLD/2_knowledges/Notes" \
     "$OLD/2_knowledges/News" \
     "$OLD/2_knowledges/Sources" \
@@ -41,6 +43,7 @@ mkdir -p \
     "$OLD/2_knowledges/Entities/Companies/Solidus Labs" \
     "$OLD/2_knowledges/Entities/Stocks/AAPL/Daily" \
     "$OLD/2_knowledges/Entities/Work" \
+    "$OLD/0_configs/rules" \
     "$OLD/1_drafts/Sessions" \
     "$OLD/3_intelligences/Skills/Coding/Review"
 
@@ -53,6 +56,15 @@ tags:
 # Alpha Note
 
 See [[Daily Plan]] and ${OLD}/2_knowledges/Entities/Stocks/AAPL/Daily/Daily Plan.md.
+Also see [[Duplicate]] and [[Missing Idea]].
+EOF
+
+cat > "$OLD/2_knowledges/Researches/One/Duplicate.md" <<'EOF'
+# Duplicate One
+EOF
+
+cat > "$OLD/2_knowledges/Researches/Two/Duplicate.md" <<'EOF'
+# Duplicate Two
 EOF
 
 cat > "$OLD/2_knowledges/Entities/Stocks/AAPL/Daily/Daily Plan.md" <<'EOF'
@@ -110,6 +122,10 @@ cat > "$OLD/AGENTS.md" <<'EOF'
 # Legacy Agents
 EOF
 
+cat > "$OLD/0_configs/rules/knowledge-management.md" <<'EOF'
+# Knowledge Management
+EOF
+
 "${ROOT}/install.sh" --vault "$VAULT" >/dev/null
 
 before=$(snapshot_old)
@@ -118,7 +134,7 @@ after=$(snapshot_old)
 [ "$before" = "$after" ] || fail "old memory changed during migration"
 
 case "$out" in
-    *'"ok":true'*'"written_count":8'*'"skipped_count":1'*) ;;
+    *'"ok":true'*'"written_count":10'*'"skipped_count":1'*) ;;
     *) fail "unexpected knowledge migration output: $out" ;;
 esac
 
@@ -126,12 +142,16 @@ assert_file "$VAULT/2_knowledge/concept/alpha-note.md"
 assert_file "$VAULT/2_knowledge/note/human-note.md"
 assert_file "$VAULT/2_knowledge/entity/company/solidus-labs/profile.md"
 assert_file "$VAULT/2_knowledge/entity/stock/aapl/daily/daily-plan.md"
+assert_file "$VAULT/2_knowledge/research/one/duplicate.md"
+assert_file "$VAULT/2_knowledge/research/two/duplicate.md"
 assert_file "$VAULT/2_knowledge/_unmapped/entity/calendar/financial-events/2026-05-15.md"
 assert_file "$VAULT/2_knowledge/_unmapped/entity/work/core-backbone-dependencies-by-schema.md"
 assert_file "$VAULT/2_knowledge/_unmapped/news/market-update.md"
 assert_file "$VAULT/2_knowledge/_unmapped/sources/raw-source.md"
 assert_missing "$VAULT/1_draft/session/skip-me.md"
 assert_contains "$VAULT/2_knowledge/concept/alpha-note.md" "[Daily Plan]"
+assert_contains "$VAULT/2_knowledge/entity/stock/aapl/daily/daily-plan.md" 'ticker: "AAPL"'
+assert_contains "$VAULT/2_knowledge/entity/company/solidus-labs/profile.md" 'display_name: "Solidus Labs"'
 
 report=$(find "$VAULT/3_intelligence/report/migration" -type f -name 'migration-knowledge-*.json' | sort | tail -1)
 assert_file "$report"
@@ -139,10 +159,15 @@ assert_contains "$report" '"kind":"mapped"'
 assert_contains "$report" '"kind":"unmapped"'
 assert_contains "$report" '"kind":"skipped"'
 assert_contains "$report" '"kind":"rewritten"'
+assert_contains "$report" '"kind":"metadata"'
+assert_contains "$report" '"metadata_count": 2'
+assert_contains "$report" '"source_mode": "read-only"'
+assert_contains "$report" 'ambiguous wikilink: Duplicate'
+assert_contains "$report" 'unresolved wikilink: Missing Idea'
 
 rerun=$("${VAULT}/0_core/script/migration.sh" --from "$OLD" --to "$VAULT" --section knowledge --json)
 case "$rerun" in
-    *'"written_count":0'*'"existing_count":8'*) ;;
+    *'"written_count":0'*'"existing_count":10'*) ;;
     *) fail "expected idempotent rerun, got: $rerun" ;;
 esac
 
@@ -151,6 +176,21 @@ assert_file "$VAULT/3_intelligence/skill/coding/review/skill.md"
 
 "${VAULT}/0_core/script/migration.sh" --from "$OLD" --to "$VAULT" --section agents-md >/dev/null
 assert_file "$VAULT/3_intelligence/agent/legacy-agents.md"
+
+"${VAULT}/0_core/script/migration.sh" --from "$OLD" --to "$VAULT" --section config >/dev/null
+assert_file "$VAULT/2_knowledge/_unmapped/config/rules/knowledge-management.md"
+
+ALL_VAULT="${WORK}/vault-all"
+"${ROOT}/install.sh" --vault "$ALL_VAULT" >/dev/null
+all_out=$("${ALL_VAULT}/0_core/script/migration.sh" --from "$OLD" --to "$ALL_VAULT" --all --json)
+case "$all_out" in
+    *'"ok":true'*'"section":"all"'*) ;;
+    *) fail "unexpected all migration output: $all_out" ;;
+esac
+assert_file "$ALL_VAULT/2_knowledge/concept/alpha-note.md"
+assert_file "$ALL_VAULT/2_knowledge/_unmapped/config/rules/knowledge-management.md"
+assert_file "$ALL_VAULT/3_intelligence/skill/coding/review/skill.md"
+assert_file "$ALL_VAULT/3_intelligence/agent/legacy-agents.md"
 
 COLLIDE="${WORK}/old-collide"
 COLLIDE_VAULT="${WORK}/vault-collide"
