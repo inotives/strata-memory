@@ -642,7 +642,8 @@ Rust migration order:
 4. Add stderr progress output every N files after basic parity is stable, controlled by `STRATA_INDEX_PROGRESS_EVERY` for non-interactive runs.
 5. Keep Bash index behavior as a reference/fallback until fixture and real-vault parity are proven.
 6. Move `search` next once index parity is stable, preserving `--query`, `--limit`, `--include-archived`, `--paths-only`, and `--json`.
-7. Move mutating commands such as `promote`, `normalize`, and `retention` later.
+7. Move non-mutating review tools next, starting with `link-review`.
+8. Move mutating commands such as `promote`, `normalize`, and `retention` later.
 
 The Rust binary is not an MVP dependency. Distribution options are:
 
