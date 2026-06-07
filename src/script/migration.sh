@@ -96,6 +96,7 @@ map_component() {
         entities) printf '%s\n' "entity" ;;
         projects) printf '%s\n' "project" ;;
         tools) printf '%s\n' "tool" ;;
+        companies) printf '%s\n' "company" ;;
         stocks) printf '%s\n' "stock" ;;
         cryptocurrencies|cryptos) printf '%s\n' "cryptocurrency" ;;
         researches) printf '%s\n' "research" ;;
@@ -154,7 +155,14 @@ plan_file() {
 
     if new_rel=$(map_legacy_rel "$old_rel"); then
         case "$new_rel" in
-            2_knowledge/concept/*|2_knowledge/entity/*|2_knowledge/research/*|2_knowledge/note/*|2_knowledge/preference/*|3_intelligence/skill/*|3_intelligence/agent/*|3_intelligence/workflow/*|3_intelligence/report/*)
+            2_knowledge/entity/project/*|2_knowledge/entity/tool/*|2_knowledge/entity/company/*|2_knowledge/entity/stock/*|2_knowledge/entity/cryptocurrency/*)
+                record mapped "$old_rel" "$new_rel" "canonical mapping"
+                ;;
+            2_knowledge/entity/*)
+                new_rel="2_knowledge/_unmapped/entity/${new_rel#2_knowledge/entity/}"
+                record unmapped "$old_rel" "$new_rel" "unknown entity bucket requires review"
+                ;;
+            2_knowledge/concept/*|2_knowledge/research/*|2_knowledge/note/*|2_knowledge/preference/*|3_intelligence/skill/*|3_intelligence/agent/*|3_intelligence/workflow/*|3_intelligence/report/*)
                 record mapped "$old_rel" "$new_rel" "canonical mapping"
                 ;;
             2_knowledge/_unmapped/*)

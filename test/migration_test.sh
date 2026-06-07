@@ -37,7 +37,10 @@ mkdir -p \
     "$OLD/2_knowledges/Notes" \
     "$OLD/2_knowledges/News" \
     "$OLD/2_knowledges/Sources" \
+    "$OLD/2_knowledges/Entities/Calendar/Financial Events" \
+    "$OLD/2_knowledges/Entities/Companies/Solidus Labs" \
     "$OLD/2_knowledges/Entities/Stocks/AAPL/Daily" \
+    "$OLD/2_knowledges/Entities/Work" \
     "$OLD/1_drafts/Sessions" \
     "$OLD/3_intelligences/Skills/Coding/Review"
 
@@ -59,6 +62,24 @@ tags:
   - research
 ---
 # Daily Plan
+EOF
+
+cat > "$OLD/2_knowledges/Entities/Companies/Solidus Labs/Profile.md" <<'EOF'
+# Solidus Labs
+
+Company note without managed tags.
+EOF
+
+cat > "$OLD/2_knowledges/Entities/Calendar/Financial Events/2026-05-15.md" <<'EOF'
+# Financial Event
+
+Calendar capture without managed tags.
+EOF
+
+cat > "$OLD/2_knowledges/Entities/Work/Core Backbone Dependencies by Schema.md" <<'EOF'
+# Core Backbone Dependencies by Schema
+
+Work note without managed tags.
 EOF
 
 cat > "$OLD/2_knowledges/Sources/Raw Source.md" <<'EOF'
@@ -97,13 +118,16 @@ after=$(snapshot_old)
 [ "$before" = "$after" ] || fail "old memory changed during migration"
 
 case "$out" in
-    *'"ok":true'*'"written_count":5'*'"skipped_count":1'*) ;;
+    *'"ok":true'*'"written_count":8'*'"skipped_count":1'*) ;;
     *) fail "unexpected knowledge migration output: $out" ;;
 esac
 
 assert_file "$VAULT/2_knowledge/concept/alpha-note.md"
 assert_file "$VAULT/2_knowledge/note/human-note.md"
+assert_file "$VAULT/2_knowledge/entity/company/solidus-labs/profile.md"
 assert_file "$VAULT/2_knowledge/entity/stock/aapl/daily/daily-plan.md"
+assert_file "$VAULT/2_knowledge/_unmapped/entity/calendar/financial-events/2026-05-15.md"
+assert_file "$VAULT/2_knowledge/_unmapped/entity/work/core-backbone-dependencies-by-schema.md"
 assert_file "$VAULT/2_knowledge/_unmapped/news/market-update.md"
 assert_file "$VAULT/2_knowledge/_unmapped/sources/raw-source.md"
 assert_missing "$VAULT/1_draft/session/skip-me.md"
@@ -118,7 +142,7 @@ assert_contains "$report" '"kind":"rewritten"'
 
 rerun=$("${VAULT}/0_core/script/migration.sh" --from "$OLD" --to "$VAULT" --section knowledge --json)
 case "$rerun" in
-    *'"written_count":0'*'"existing_count":5'*) ;;
+    *'"written_count":0'*'"existing_count":8'*) ;;
     *) fail "expected idempotent rerun, got: $rerun" ;;
 esac
 
