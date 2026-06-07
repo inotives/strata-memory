@@ -31,6 +31,27 @@ assert_contains "$out" '"name":"migration_001"'
 assert_contains "$out" '"name":"tag_review"'
 assert_contains "$out" '"name":"db_writable"'
 assert_contains "$out" '"name":"agents"'
+assert_contains "$out" '"name":"status_review"'
+
+mkdir -p "${VAULT}/1_draft/research"
+cat > "${VAULT}/1_draft/research/invalid-status.md" <<'EOF'
+---
+title: "Invalid Status"
+description: ""
+status: "pending-review"
+---
+# Invalid Status
+EOF
+
+if out=$("${VAULT}/0_core/script/doctor.sh" --vault "$VAULT" --json 2>/dev/null); then
+    fail "expected doctor to fail on invalid frontmatter status"
+fi
+
+assert_contains "$out" '"ok":false'
+assert_contains "$out" '"name":"status_review"'
+assert_contains "$out" '"status":"error"'
+
+rm "${VAULT}/1_draft/research/invalid-status.md"
 
 mkdir -p "${VAULT}/2_knowledge/research"
 cat > "${VAULT}/2_knowledge/research/broken.md" <<'EOF'

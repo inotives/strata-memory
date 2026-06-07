@@ -344,6 +344,9 @@ fn build_document(
             default_status(strata, rel).to_string()
         }
     });
+    if !valid_status(&status) {
+        return Err(format!("invalid status for {rel}: {status}").into());
+    }
 
     let id = frontmatter
         .scalar("id")
@@ -629,6 +632,13 @@ fn default_status(strata: &str, rel: &str) -> &'static str {
         "2_knowledge" | "3_intelligence" => "verified",
         _ => "pending",
     }
+}
+
+fn valid_status(status: &str) -> bool {
+    matches!(
+        status,
+        "pending" | "verified" | "archived" | "generated" | "core"
+    )
 }
 
 fn make_id(rel: &str) -> String {

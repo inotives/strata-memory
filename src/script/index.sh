@@ -148,6 +148,13 @@ index_one() {
             *) status=$(strata_default_status "$strata" "$rel") ;;
         esac
     fi
+    case "$status" in
+        pending|verified|archived|generated|core) ;;
+        *)
+            strata_log_error "invalid status for ${rel}: ${status}"
+            exit 1
+            ;;
+    esac
 
     id=$(strata_extract_scalar "$abs" id)
     [ -n "$id" ] || id=$(strata_make_id "$rel")
