@@ -614,9 +614,9 @@ Temporary files must live under `0_core/tmp/`, using `mktemp` with a vault-local
 mktemp -d "${STRATA_VAULT}/0_core/tmp/promote-XXXXXXXX"
 ```
 
-## 14. Post-MVP Rust Core CLI
+## 14. Phase 4a Rust Core CLI
 
-The Bash scripts are the MVP command contract and remain useful as compatibility wrappers and emergency fallbacks. Performance-sensitive and correctness-sensitive internals may move to a compiled Rust CLI after migration validation is accepted.
+The Bash scripts are the MVP command contract and remain useful as compatibility wrappers and emergency fallbacks. Phase 4a introduces an optional compiled Rust CLI for performance-sensitive and correctness-sensitive internals, starting with indexing.
 
 Target installed shape:
 
@@ -637,11 +637,12 @@ Shell scripts keep the public command surface stable and delegate to the Rust bi
 Rust migration order:
 
 1. Implement `strata index` first, because indexing is the slowest current path.
-2. Preserve exact `index.sh` behavior for `--target`, `--full`, `--vault`, and `--json`.
-3. Use one process, one SQLite connection, one full-index transaction, prepared statements, and progress output every N files.
-4. Keep Bash index behavior as a reference/fallback until fixture and real-vault parity are proven.
-5. Move `search` and review tools next only after index parity is stable.
-6. Move mutating commands such as `promote`, `normalize`, and `retention` later.
+2. Preserve `index.sh` behavior for `--target`, `--full`, `--vault`, and `--json`.
+3. Use one process, one SQLite connection, one full-index transaction, and prepared statements.
+4. Add progress output every N files after basic parity is stable.
+5. Keep Bash index behavior as a reference/fallback until fixture and real-vault parity are proven.
+6. Move `search` and review tools next only after index parity is stable.
+7. Move mutating commands such as `promote`, `normalize`, and `retention` later.
 
 The Rust binary is not an MVP dependency. Distribution options are:
 

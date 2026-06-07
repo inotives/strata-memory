@@ -73,7 +73,7 @@ write_manifest() {
         printf '  "files": [\n'
         (
             cd "$CORE"
-            find db doc script template -type f 2>/dev/null | sort | while IFS= read -r file; do
+            find bin db doc script template -type f 2>/dev/null | sort | while IFS= read -r file; do
                 cksum_out=$(cksum "$file")
                 checksum=${cksum_out%% *}
                 size_rest=${cksum_out#* }
@@ -95,6 +95,11 @@ copy_tree "${SRC_DIR}/db" "${CORE}/db"
 copy_tree "${SRC_DIR}/doc" "${CORE}/doc"
 copy_tree "${SRC_DIR}/template" "${CORE}/template"
 
+mkdir -p "${CORE}/bin"
+if [ -x "${SRC_DIR}/rust/strata/target/release/strata" ]; then
+    cp "${SRC_DIR}/rust/strata/target/release/strata" "${CORE}/bin/strata"
+fi
+
 if [ ! -f "${CORE}/config/configs.yaml" ]; then
     cp "${SRC_DIR}/template/config/configs.yaml" "${CORE}/config/configs.yaml"
 fi
@@ -108,6 +113,7 @@ if [ ! -f "${VAULT}/AGENTS.md" ]; then
 fi
 
 find "${CORE}/script" -type f -name '*.sh' -exec chmod +x {} \;
+[ ! -f "${CORE}/bin/strata" ] || chmod +x "${CORE}/bin/strata"
 write_manifest
 
 if [ "$json" = true ]; then
