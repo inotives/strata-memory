@@ -200,7 +200,47 @@ Validation:
 - `version` increments only for semantic content edits, not mechanical migration, normalization, archival, or promotion.
 - IDs are stable across moves and migration. Generate IDs only when missing.
 
-### 5.3 Intelligence Schema
+### 5.3 Draft Research Template
+
+Research drafts should preserve generation context and review confidence without requiring immediate curation. The installed template lives at `0_core/template/draft/research-draft.md`.
+
+```yaml
+---
+id: ""
+title: "Research Title"
+description: ""
+strata: "1_draft"
+type: "research"
+status: "pending"
+generated_by: "agent-or-model-name"
+generated_at: "2026-06-06T13:00:00Z"
+research_method: "web-search"
+confidence: "medium"
+tags:
+  - research
+sources:
+  - "https://example.com/source"
+sources_cited: 1
+summary: "One-paragraph summary of the research question, scope, and main finding."
+version: 1
+created: "2026-06-06"
+modified: "2026-06-06"
+---
+```
+
+Draft-specific fields:
+
+- `type`: draft kind such as `research`, `note`, `skill`, `agent`, `workflow`, or `session`.
+- `generated_by`: agent, model, or toolchain that produced the draft.
+- `generated_at`: UTC timestamp for generated drafts.
+- `research_method`: short method label such as `web-search`, `repo-analysis`, `interview`, `manual-notes`, or `mixed`.
+- `confidence`: `low`, `medium`, or `high`; this is a reviewer signal, not verification.
+- `summary`: compact abstract used by agents before reading the full draft.
+- `sources_cited`: count of cited external sources when that is cheaper to inspect than the full source list.
+
+Promotion into `2_knowledge` must convert `status` to `verified`, keep the archived draft as provenance, and replace draft-only generation fields only when they no longer describe the durable artifact.
+
+### 5.4 Intelligence Schema
 
 Skills, agents, and workflows use the base durable schema fields:
 
