@@ -123,6 +123,9 @@ cat > "$OLD/AGENTS.md" <<'EOF'
 EOF
 
 cat > "$OLD/0_configs/rules/knowledge-management.md" <<'EOF'
+---
+status: durable
+---
 # Knowledge Management
 EOF
 
@@ -179,6 +182,7 @@ assert_file "$VAULT/3_intelligence/agent/legacy-agents.md"
 
 "${VAULT}/0_core/script/migration.sh" --from "$OLD" --to "$VAULT" --section config >/dev/null
 assert_file "$VAULT/2_knowledge/_unmapped/config/rules/knowledge-management.md"
+assert_contains "$VAULT/2_knowledge/_unmapped/config/rules/knowledge-management.md" 'status: "verified"'
 
 ALL_VAULT="${WORK}/vault-all"
 "${ROOT}/install.sh" --vault "$ALL_VAULT" >/dev/null

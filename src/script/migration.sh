@@ -437,6 +437,45 @@ inject_display_metadata() {
     record metadata "$old_rel" "$new_rel" "${key} preserved as ${value}"
 }
 
+default_status_for_target() {
+    case "$1" in
+        1_draft/*_archived/*|1_draft/_archived/*) printf '%s\n' archived ;;
+        1_draft/*) printf '%s\n' pending ;;
+        3_intelligence/report/*) printf '%s\n' generated ;;
+        2_knowledge/*|3_intelligence/*) printf '%s\n' verified ;;
+        0_core/*) printf '%s\n' core ;;
+        *) printf '%s\n' verified ;;
+    esac
+}
+
+sanitize_migrated_status() {
+    local content=$1
+    local old_rel=$2
+    local new_rel=$3
+    local default_status
+    local current_status
+    local tmp
+
+    default_status=$(default_status_for_target "$new_rel")
+    current_status=$(strata_extract_scalar "$content" status)
+    case "$current_status" in
+        ""|pending|verified|archived|generated|core) return 0 ;;
+    esac
+
+    tmp="${content}.status"
+    awk -v status="$default_status" '
+    NR == 1 && $0 == "---" { in_fm = 1; print; next }
+    in_fm && $0 == "---" { in_fm = 0; print; next }
+    in_fm && /^status:/ {
+      printf "status: \"%s\"\n", status
+      next
+    }
+    { print }
+    ' "$content" > "$tmp"
+    mv "$tmp" "$content"
+    record metadata "$old_rel" "$new_rel" "status normalized from ${current_status} to ${default_status}"
+}
+
 candidate_count=0
 existing_count=0
 written_count=0
@@ -444,9 +483,13 @@ written_count=0
 while IFS="$(printf '\t')" read -r old_abs old_rel new_rel; do
     [ -n "$old_abs" ] || continue
     candidate_count=$((candidate_count + 1))
+    if [ $((candidate_count % 100)) -eq 0 ]; then
+        printf 'migration progress: %s candidates processed\n' "$candidate_count" >&2
+    fi
     content="$content_dir/$candidate_count"
     rewrite_links "$old_abs" "$old_rel" "$new_rel" "$content"
     inject_display_metadata "$content" "$old_rel" "$new_rel"
+    sanitize_migrated_status "$content" "$old_rel" "$new_rel"
 
     target="$to/$new_rel"
     if [ -f "$target" ]; then
@@ -470,13 +513,15 @@ while IFS="$(printf '\t')" read -r old_abs old_rel new_rel; do
     cp "$content" "$target"
     written_count=$((written_count + 1))
     record written "$old_rel" "$new_rel" "migrated"
-    if [ -x "$to/0_core/script/index.sh" ]; then
-        "$to/0_core/script/index.sh" --vault "$to" --target "$target" >/dev/null 2>&1 || record warning "$old_rel" "$new_rel" "indexing failed"
-    fi
 done < "$plan_tmp"
+
+if [ "$written_count" -gt 0 ] && [ -x "$to/0_core/script/index.sh" ]; then
+    "$to/0_core/script/index.sh" --vault "$to" --full >/dev/null 2>&1 || record warning "" "" "full indexing failed"
+fi
 
 generated_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 report_path="$report_dir/migration-${section_name}-$(date -u '+%Y-%m-%dT%H%M%SZ').json"
+report_tmp=$(mktemp "$tmp_dir/migration-report-XXXXXXXX.json")
 
 mapped_count=$(awk -F '\t' '$1 == "mapped" { count++ } END { print count + 0 }' "$records_tmp")
 unmapped_count=$(awk -F '\t' '$1 == "unmapped" { count++ } END { print count + 0 }' "$records_tmp")
@@ -515,7 +560,9 @@ metadata_count=$(awk -F '\t' '$1 == "metadata" { count++ } END { print count + 0
     done < "$records_tmp"
     printf '\n  ]\n'
     printf '}\n'
-} > "$report_path"
+} > "$report_tmp"
+
+mv "$report_tmp" "$report_path"
 
 if [ "$json" = true ]; then
     printf '{"ok":true,"section":'
