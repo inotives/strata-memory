@@ -126,7 +126,7 @@ Installed shape:
 ~/.strata-memory/0_core/script/index.sh
 ```
 
-`index.sh` keeps the public command stable and delegates to `0_core/bin/strata` only when that binary exists. Set `STRATA_INDEX_BASH_FALLBACK=1` to force the Bash indexer.
+`index.sh` and `search.sh` keep the public command stable and delegate to `0_core/bin/strata` only when that binary exists. Set `STRATA_INDEX_BASH_FALLBACK=1` to force the Bash indexer, or `STRATA_SEARCH_BASH_FALLBACK=1` to force the Bash searcher.
 
 Rust full indexing reports progress on stderr when run interactively. For non-interactive runs, set `STRATA_INDEX_PROGRESS_EVERY=N` to print progress every N scanned files, or `0` to disable progress.
 

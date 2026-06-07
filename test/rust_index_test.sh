@@ -73,9 +73,7 @@ Archived draft.
 EOF
 
 STRATA_BIN="${ROOT}/src/rust/strata/target/debug/strata"
-if [ ! -x "$STRATA_BIN" ]; then
-    cargo build --manifest-path "${ROOT}/src/rust/strata/Cargo.toml" >/dev/null
-fi
+cargo build --manifest-path "${ROOT}/src/rust/strata/Cargo.toml" >/dev/null
 
 "$STRATA_BIN" index --vault "$VAULT" --target "${VAULT}/2_knowledge/research/sqlite-fts.md" >/dev/null
 DB="${VAULT}/0_core/db/strata.db"

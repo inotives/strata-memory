@@ -19,12 +19,21 @@ struct Cli {
 #[derive(Debug)]
 enum Command {
     Index(IndexMode),
+    Search(SearchArgs),
 }
 
 #[derive(Debug)]
 enum IndexMode {
     Full,
     Target(PathBuf),
+}
+
+#[derive(Debug)]
+struct SearchArgs {
+    query: String,
+    limit: usize,
+    include_archived: bool,
+    paths_only: bool,
 }
 
 #[derive(Debug)]
@@ -85,6 +94,9 @@ fn run() -> Result<()> {
                 println!("Indexed {indexed} file(s)");
             }
         }
+        Command::Search(search_args) => {
+            search(&cli.vault, &search_args, cli.json)?;
+        }
     }
 
     Ok(())
@@ -97,43 +109,86 @@ fn parse_args(args: Vec<String>) -> Result<Cli> {
     }
 
     let mut iter = args.into_iter();
-    let command = iter.next().ok_or("missing command")?;
-    if command != "index" {
-        return Err(format!("unknown command: {command}").into());
-    }
-
     let mut vault = env::var("STRATA_VAULT")
         .map(PathBuf::from)
         .unwrap_or_else(|_| home_dir().join(".strata-memory"));
     let mut json = false;
-    let mut full = false;
-    let mut target: Option<PathBuf> = None;
+    let command = iter.next().ok_or("missing command")?;
 
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "--full" => full = true,
-            "--target" => {
-                let value = iter.next().ok_or("--target requires FILE")?;
-                target = Some(PathBuf::from(value));
+    let parsed_command = match command.as_str() {
+        "index" => {
+            let mut full = false;
+            let mut target: Option<PathBuf> = None;
+
+            while let Some(arg) = iter.next() {
+                match arg.as_str() {
+                    "--full" => full = true,
+                    "--target" => {
+                        let value = iter.next().ok_or("--target requires FILE")?;
+                        target = Some(PathBuf::from(value));
+                    }
+                    "--vault" => {
+                        let value = iter.next().ok_or("--vault requires PATH")?;
+                        vault = PathBuf::from(value);
+                    }
+                    "--json" => json = true,
+                    other => return Err(format!("unknown argument: {other}").into()),
+                }
             }
-            "--vault" => {
-                let value = iter.next().ok_or("--vault requires PATH")?;
-                vault = PathBuf::from(value);
-            }
-            "--json" => json = true,
-            other => return Err(format!("unknown argument: {other}").into()),
+
+            let mode = match (full, target) {
+                (true, Some(_)) => return Err("use either --target or --full, not both".into()),
+                (true, None) => IndexMode::Full,
+                (false, Some(path)) => IndexMode::Target(path),
+                (false, None) => IndexMode::Full,
+            };
+            Command::Index(mode)
         }
-    }
+        "search" => {
+            let mut query: Option<String> = None;
+            let mut limit = 10;
+            let mut include_archived = false;
+            let mut paths_only = false;
 
-    let mode = match (full, target) {
-        (true, Some(_)) => return Err("use either --target or --full, not both".into()),
-        (true, None) => IndexMode::Full,
-        (false, Some(path)) => IndexMode::Target(path),
-        (false, None) => IndexMode::Full,
+            while let Some(arg) = iter.next() {
+                match arg.as_str() {
+                    "--query" | "-q" => {
+                        query = Some(iter.next().ok_or("--query requires TEXT")?);
+                    }
+                    "--vault" => {
+                        let value = iter.next().ok_or("--vault requires PATH")?;
+                        vault = PathBuf::from(value);
+                    }
+                    "--limit" => {
+                        let value = iter.next().ok_or("--limit requires N")?;
+                        limit = value
+                            .parse::<usize>()
+                            .map_err(|_| "limit must be a positive integer")?;
+                    }
+                    "--include-archived" => include_archived = true,
+                    "--paths-only" => paths_only = true,
+                    "--json" => json = true,
+                    other if query.is_none() => query = Some(other.to_string()),
+                    other => return Err(format!("unknown argument: {other}").into()),
+                }
+            }
+
+            if limit == 0 {
+                return Err("limit must be a positive integer".into());
+            }
+
+            Command::Search(SearchArgs {
+                query: query.ok_or("missing search query")?,
+                limit,
+                include_archived,
+                paths_only,
+            })
+        }
+        _ => return Err(format!("unknown command: {command}").into()),
     };
 
     Ok(Cli {
-        command: Command::Index(mode),
+        command: parsed_command,
         vault,
         json,
     })
@@ -141,6 +196,7 @@ fn parse_args(args: Vec<String>) -> Result<Cli> {
 
 fn print_usage() {
     println!("Usage: strata index [--target FILE | --full] [--vault PATH] [--json]");
+    println!("       strata search --query TEXT [--vault PATH] [--limit N] [--include-archived] [--paths-only] [--json]");
 }
 
 fn home_dir() -> PathBuf {
@@ -164,6 +220,114 @@ fn index(vault: &Path, mode: IndexMode) -> Result<usize> {
             Ok(indexed)
         }
     }
+}
+
+fn search(vault: &Path, args: &SearchArgs, json: bool) -> Result<()> {
+    let db_path = vault.join("0_core/db/strata.db");
+    if !db_path.is_file() {
+        return Err("database not found; run index.sh first".into());
+    }
+
+    let conn = Connection::open(db_path)?;
+    if args.paths_only {
+        let mut sql = String::from(
+            "SELECT memory_index.path
+FROM memory_fts
+JOIN memory_index ON memory_fts.rowid = memory_index.rowid
+WHERE memory_fts MATCH ?1",
+        );
+        if !args.include_archived {
+            sql.push_str(" AND memory_index.status <> 'archived'");
+        }
+        sql.push_str(
+            "
+ORDER BY bm25(memory_fts, 8.0, 4.0, 2.0, 1.0)
+LIMIT ?2",
+        );
+
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(params![args.query, args.limit as i64], |row| {
+            row.get::<_, String>(0)
+        })?;
+        for row in rows {
+            println!("{}", row?);
+        }
+        return Ok(());
+    }
+
+    let mut sql = String::from(
+        "SELECT memory_index.path,
+       ifnull(memory_index.title,''),
+       memory_index.status,
+       printf('%.6f', bm25(memory_fts, 8.0, 4.0, 2.0, 1.0)),
+       replace(replace(snippet(memory_fts, 3, '[', ']', '...', 12), char(10), ' '), char(9), ' ')
+FROM memory_fts
+JOIN memory_index ON memory_fts.rowid = memory_index.rowid
+WHERE memory_fts MATCH ?1",
+    );
+    if !args.include_archived {
+        sql.push_str(" AND memory_index.status <> 'archived'");
+    }
+    sql.push_str(
+        "
+ORDER BY bm25(memory_fts, 8.0, 4.0, 2.0, 1.0)
+LIMIT ?2",
+    );
+
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(params![args.query, args.limit as i64], |row| {
+        Ok(SearchResult {
+            path: row.get(0)?,
+            title: row.get(1)?,
+            status: row.get(2)?,
+            rank: row.get(3)?,
+            snippet: row.get(4)?,
+        })
+    })?;
+
+    let mut results = Vec::new();
+    for row in rows {
+        results.push(row?);
+    }
+
+    if json {
+        print!(
+            "{{\"ok\":true,\"query\":\"{}\",\"results\":[",
+            json_escape(&args.query)
+        );
+        for (idx, result) in results.iter().enumerate() {
+            if idx > 0 {
+                print!(",");
+            }
+            print!(
+                "{{\"path\":\"{}\",\"title\":\"{}\",\"status\":\"{}\",\"rank\":{},\"snippet\":\"{}\"}}",
+                json_escape(&result.path),
+                json_escape(&result.title),
+                json_escape(&result.status),
+                result.rank,
+                json_escape(&result.snippet)
+            );
+        }
+        println!("]}}");
+    } else {
+        for result in results {
+            println!(
+                "{}\t{}\t{}\t{}\t{}",
+                result.path, result.title, result.status, result.rank, result.snippet
+            );
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Debug)]
+struct SearchResult {
+    path: String,
+    title: String,
+    status: String,
+    rank: String,
+    snippet: String,
 }
 
 fn migrate(vault: &Path) -> Result<()> {

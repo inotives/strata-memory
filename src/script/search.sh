@@ -80,6 +80,22 @@ esac
 db=$(strata_db_path)
 [ -f "$db" ] || { strata_log_error "database not found; run index.sh first"; exit 1; }
 
+vault=$(strata_vault)
+rust_bin="${vault}/0_core/bin/strata"
+if [ "${STRATA_SEARCH_BASH_FALLBACK:-}" != "1" ] && [ -x "$rust_bin" ]; then
+    args=(search --vault "$vault" --query "$query" --limit "$limit")
+    if [ "$include_archived" = true ]; then
+        args+=(--include-archived)
+    fi
+    if [ "$paths_only" = true ]; then
+        args+=(--paths-only)
+    fi
+    if [ "$json" = true ]; then
+        args+=(--json)
+    fi
+    exec "$rust_bin" "${args[@]}"
+fi
+
 sqlite_bin=$(strata_sqlite_bin)
 where_status=""
 if [ "$include_archived" = false ]; then
