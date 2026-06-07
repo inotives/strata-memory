@@ -200,7 +200,47 @@ Validation:
 - `version` increments only for semantic content edits, not mechanical migration, normalization, archival, or promotion.
 - IDs are stable across moves and migration. Generate IDs only when missing.
 
-### 5.3 Intelligence Schema
+### 5.3 Draft Research Template
+
+Research drafts should preserve generation context and review confidence without requiring immediate curation. The installed template lives at `0_core/template/draft/research-draft.md`.
+
+```yaml
+---
+id: ""
+title: "Research Title"
+description: ""
+strata: "1_draft"
+type: "research"
+status: "pending"
+generated_by: "agent-or-model-name"
+generated_at: "2026-06-06T13:00:00Z"
+research_method: "web-search"
+confidence: "medium"
+tags:
+  - research
+sources:
+  - "https://example.com/source"
+sources_cited: 1
+summary: "One-paragraph summary of the research question, scope, and main finding."
+version: 1
+created: "2026-06-06"
+modified: "2026-06-06"
+---
+```
+
+Draft-specific fields:
+
+- `type`: draft kind such as `research`, `note`, `skill`, `agent`, `workflow`, or `session`.
+- `generated_by`: agent, model, or toolchain that produced the draft.
+- `generated_at`: UTC timestamp for generated drafts.
+- `research_method`: short method label such as `web-search`, `repo-analysis`, `interview`, `manual-notes`, or `mixed`.
+- `confidence`: `low`, `medium`, or `high`; this is a reviewer signal, not verification.
+- `summary`: compact abstract used by agents before reading the full draft.
+- `sources_cited`: count of cited external sources when that is cheaper to inspect than the full source list.
+
+Promotion into `2_knowledge` must convert `status` to `verified`, keep the archived draft as provenance, and replace draft-only generation fields only when they no longer describe the durable artifact.
+
+### 5.4 Intelligence Schema
 
 Skills, agents, and workflows use the base durable schema fields:
 
@@ -574,7 +614,44 @@ Temporary files must live under `0_core/tmp/`, using `mktemp` with a vault-local
 mktemp -d "${STRATA_VAULT}/0_core/tmp/promote-XXXXXXXX"
 ```
 
-## 14. Git and Privacy
+## 14. Post-MVP Rust Core CLI
+
+The Bash scripts are the MVP command contract and remain useful as compatibility wrappers and emergency fallbacks. Performance-sensitive and correctness-sensitive internals may move to a compiled Rust CLI after migration validation is accepted.
+
+Target installed shape:
+
+```text
+0_core/bin/strata
+0_core/script/index.sh
+0_core/script/search.sh
+0_core/script/doctor.sh
+```
+
+Shell scripts keep the public command surface stable and delegate to the Rust binary when available:
+
+```bash
+0_core/script/index.sh --full --vault ~/.strata-memory --json
+0_core/bin/strata index --full --vault ~/.strata-memory --json
+```
+
+Rust migration order:
+
+1. Implement `strata index` first, because indexing is the slowest current path.
+2. Preserve exact `index.sh` behavior for `--target`, `--full`, `--vault`, and `--json`.
+3. Use one process, one SQLite connection, one full-index transaction, prepared statements, and progress output every N files.
+4. Keep Bash index behavior as a reference/fallback until fixture and real-vault parity are proven.
+5. Move `search` and review tools next only after index parity is stable.
+6. Move mutating commands such as `promote`, `normalize`, and `retention` later.
+
+The Rust binary is not an MVP dependency. Distribution options are:
+
+- copy a prebuilt platform binary into `0_core/bin/strata`
+- build from source with Cargo during development
+- fall back to Bash scripts when no compatible binary is installed
+
+The first Rust milestone should happen before watcher implementation, because real-time sync depends on indexing throughput and correctness.
+
+## 15. Git and Privacy
 
 Git is supported but not required. The private vault can be stored in a private git repo.
 
@@ -600,7 +677,7 @@ Default `.gitignore` should exclude:
 - `.env`-style secrets
 - large pasted logs
 
-## 15. Migration
+## 16. Migration
 
 Migration reads from old Agent Memory and writes into the new Strata vault. It never modifies the old memory.
 
@@ -624,7 +701,7 @@ Rules:
 - Put unmatched migrated knowledge under `_unmapped` for review.
 - Write migration reports under `3_intelligence/report/migration/`.
 
-## 16. Quality Limits
+## 17. Quality Limits
 
 Line-count checks warn only. They do not block.
 
@@ -646,7 +723,7 @@ quality:
 
 `SKILL.md` should stay under the skill limit. Large examples, references, and templates belong in `resource/`. Scripts are excluded from prose line limits.
 
-## 17. Roadmap
+## 18. Roadmap
 
 ### Phase 0: Public Engine Repo Spec and Installer
 
@@ -664,6 +741,10 @@ Migrate selected sections from `~/.agent-knowledge/memory` into `~/.strata-memor
 
 Validate migrated content, resolve unmapped rooms, fix links/tags, and stabilize the private vault.
 
+### Phase 4a: Rust Core CLI Foundation
+
+Add an optional Rust `strata` binary behind the existing Bash command contract, starting with bulk indexing and preserving Bash fallback behavior.
+
 ### Phase 4: Watchers and Real-Time Sync
 
 Add `watcher/linux.sh` and `watcher/mac.sh` only after migration validation is complete.
@@ -676,7 +757,7 @@ Add optional `sqlite-vec` and local embeddings after FTS5 and lifecycle behavior
 
 Add workflow execution orchestration after skills, agents, and reports have stable contracts.
 
-## 18. MVP Acceptance
+## 19. MVP Acceptance
 
 Linux-only acceptance for MVP:
 

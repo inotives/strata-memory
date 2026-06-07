@@ -130,6 +130,16 @@ Run all commands from the installed vault scripts. Most commands accept `--vault
 | `agents-generate.sh --vault PATH [--json]` | Generate vault `AGENTS.md` while preserving manual sections. |
 | `retention.sh --vault PATH [--apply] [--json]` | Report or delete archived drafts past retention policy. |
 
+## Draft Templates
+
+Installed vault templates live under `0_core/template`. Research drafts can start from:
+
+```text
+0_core/template/draft/research-draft.md
+```
+
+The research draft template records generation context before review: `type`, `generated_by`, `generated_at`, `research_method`, `confidence`, `summary`, and `sources_cited`. Drafts use `strata: "1_draft"` and `status: "pending"` until promotion.
+
 ## Database And Recovery
 
 Markdown files are the source of truth. The SQLite database at `~/.strata-memory/0_core/db/strata.db` is a derived index and can be rebuilt.
