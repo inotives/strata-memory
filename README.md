@@ -39,12 +39,6 @@ By default, the private vault lives at:
 ~/.strata-memory
 ```
 
-The legacy Agent Memory source used by the migration command defaults to:
-
-```text
-~/.agent-knowledge/memory
-```
-
 ## Core Model
 
 Strata uses a core-plus-three-tier lifecycle:
@@ -78,7 +72,7 @@ Strata-Memory does not auto-install dependencies. On Debian/Ubuntu-like systems:
 sudo apt install bash sqlite3 gawk sed findutils coreutils jq yq
 ```
 
-SQLite should support FTS5 for full search indexing. The migration/database scripts detect FTS5 support and record migration `002` only when available.
+SQLite should support FTS5 for full search indexing. The database scripts detect FTS5 support and record migration `002` only when available.
 
 ## Install
 
@@ -117,7 +111,7 @@ After install, run:
 
 ## Common Commands
 
-Run all commands from the installed vault scripts. Most commands accept `--vault PATH`; most review and migration commands also accept `--json`.
+Run all commands from the installed vault scripts. Most commands accept `--vault PATH`; most review commands also accept `--json`.
 
 | Command | Purpose |
 |---|---|
@@ -135,59 +129,12 @@ Run all commands from the installed vault scripts. Most commands accept `--vault
 | `config-compile.sh --vault PATH [--json]` | Validate config and write `0_core/cache/config.compiled.json`. Requires `jq` and `yq`. |
 | `agents-generate.sh --vault PATH [--json]` | Generate vault `AGENTS.md` while preserving manual sections. |
 | `retention.sh --vault PATH [--apply] [--json]` | Report or delete archived drafts past retention policy. |
-| `migration.sh --from PATH --to PATH --section NAME [--json]` | Migrate selected legacy Agent Memory sections. |
-
-## Migration
-
-Migrate from legacy Agent Memory into a Strata vault:
-
-```bash
-~/.strata-memory/0_core/script/migration.sh \
-  --from ~/.agent-knowledge/memory \
-  --to ~/.strata-memory \
-  --section knowledge \
-  --json
-```
-
-Available sections:
-
-| Section | Source | Target behavior |
-|---|---|---|
-| `config` | `0_configs/**/*.md` | Copies into `2_knowledge/_unmapped/config/` for review. |
-| `knowledge` | `2_knowledges/**/*.md` | Maps concepts, research, notes, preferences, and known entity buckets into canonical `2_knowledge` rooms. Legacy drafts are reported as skipped. |
-| `intelligence` | `3_intelligences/**/*.md` plus non-Markdown legacy report artifacts | Maps skills, agents, workflows, and reports into `3_intelligence`. |
-| `reports` | non-`.md` files under `3_intelligences/reports/` | Copies raw `.html`, `.json`, and other report artifacts into `3_intelligence/report/` without Markdown rewriting. |
-| `agents-md` | legacy root `AGENTS.md` | Preserves it as `3_intelligence/agent/legacy-agents.md`. |
-| `--all` | all standard sections | Runs `config`, `knowledge`, `intelligence`, and `agents-md`. |
-
-Migration writes audit reports to:
-
-```text
-~/.strata-memory/3_intelligence/report/migration/
-```
-
-Migration is designed to be source read-only and idempotent. Existing matching target files are counted as `existing`. Existing target files with different content block the migration rather than overwriting user changes.
-
-## Report Artifacts
-
-Legacy report artifacts may be HTML or JSON rather than Markdown. These are canonical output artifacts, not Markdown knowledge records. They are copied raw under `3_intelligence/report/` and are not indexed by `index.sh`, which intentionally indexes only Markdown.
-
-If an older migration run missed these artifacts, install the current engine and run:
-
-```bash
-./install.sh --vault ~/.strata-memory
-~/.strata-memory/0_core/script/migration.sh \
-  --from ~/.agent-knowledge/memory \
-  --to ~/.strata-memory \
-  --section reports \
-  --json
-```
 
 ## Database And Recovery
 
 Markdown files are the source of truth. The SQLite database at `~/.strata-memory/0_core/db/strata.db` is a derived index and can be rebuilt.
 
-If indexing or migration reports SQLite lock, journal, or disk I/O errors after a crash or reboot, first check that the vault filesystem is writable:
+If indexing reports SQLite lock, journal, or disk I/O errors after a crash or reboot, first check that the vault filesystem is writable:
 
 ```bash
 findmnt -T ~/.strata-memory -no TARGET,OPTIONS
@@ -213,7 +160,7 @@ sqlite3 ~/.strata-memory/0_core/db/strata.db 'PRAGMA quick_check;'
 
 ## Reviews And Validation
 
-Run these after migration or bulk edits:
+Run these after bulk edits:
 
 ```bash
 ~/.strata-memory/0_core/script/doctor.sh --vault ~/.strata-memory --json
@@ -236,7 +183,6 @@ Run focused checks:
 
 ```bash
 rtk bash -n install.sh src/script/*.sh src/script/lib/*.sh test/*.sh
-rtk bash test/migration_test.sh
 rtk bash test/doctor_test.sh
 ```
 
