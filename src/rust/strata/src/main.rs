@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::error::Error;
 use std::fs;
+use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -222,19 +223,39 @@ fn migrate(vault: &Path) -> Result<()> {
 fn index_full(conn: &mut Connection, vault: &Path) -> Result<usize> {
     let files = collect_markdown_files(vault)?;
     let mut seen = HashSet::new();
+    let progress_every = progress_interval();
+    let total = files.len();
 
     let tx = conn.transaction()?;
     let mut indexed = 0;
-    for file in &files {
+    for (idx, file) in files.iter().enumerate() {
         if let Some(rel) = rel_path(file, vault) {
             seen.insert(rel);
         }
         indexed += index_one(&tx, vault, file)?;
+        if progress_every > 0 {
+            let current = idx + 1;
+            if current % progress_every == 0 || current == total {
+                eprintln!("strata index: {current}/{total} files scanned, {indexed} indexed");
+            }
+        }
     }
     remove_stale(&tx, &seen)?;
     tx.commit()?;
 
     Ok(indexed)
+}
+
+fn progress_interval() -> usize {
+    if let Ok(value) = env::var("STRATA_INDEX_PROGRESS_EVERY") {
+        return value.parse::<usize>().unwrap_or(0);
+    }
+
+    if std::io::stderr().is_terminal() {
+        100
+    } else {
+        0
+    }
 }
 
 fn collect_markdown_files(vault: &Path) -> Result<Vec<PathBuf>> {

@@ -639,7 +639,7 @@ Rust migration order:
 1. Implement `strata index` first, because indexing is the slowest current path.
 2. Preserve `index.sh` behavior for `--target`, `--full`, `--vault`, and `--json`.
 3. Use one process, one SQLite connection, one full-index transaction, and prepared statements.
-4. Add progress output every N files after basic parity is stable.
+4. Add stderr progress output every N files after basic parity is stable, controlled by `STRATA_INDEX_PROGRESS_EVERY` for non-interactive runs.
 5. Keep Bash index behavior as a reference/fallback until fixture and real-vault parity are proven.
 6. Move `search` and review tools next only after index parity is stable.
 7. Move mutating commands such as `promote`, `normalize`, and `retention` later.

@@ -128,6 +128,8 @@ Installed shape:
 
 `index.sh` keeps the public command stable and delegates to `0_core/bin/strata` only when that binary exists. Set `STRATA_INDEX_BASH_FALLBACK=1` to force the Bash indexer.
 
+Rust full indexing reports progress on stderr when run interactively. For non-interactive runs, set `STRATA_INDEX_PROGRESS_EVERY=N` to print progress every N scanned files, or `0` to disable progress.
+
 ## Common Commands
 
 Run all commands from the installed vault scripts. Most commands accept `--vault PATH`; most review commands also accept `--json`.
