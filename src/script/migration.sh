@@ -14,7 +14,7 @@ usage() {
 Usage: migration.sh [--from PATH] [--to PATH] [--section NAME | --all] [--json]
 
 Migrate selected sections from legacy Agent Memory into a Strata vault.
-Sections: config, knowledge, intelligence, agents-md.
+Sections: config, knowledge, intelligence, reports, agents-md.
 USAGE
 }
 
@@ -216,6 +216,24 @@ plan_section() {
             if [ -d "$from/3_intelligences" ]; then
                 find "$from/3_intelligences" -type f -name '*.md' 2>/dev/null | sort | while IFS= read -r file; do
                     plan_file "$file" "${file#"$from"/}"
+                done
+                find "$from/3_intelligences" -type f ! -name '*.md' 2>/dev/null | sort | while IFS= read -r file; do
+                    rel=${file#"$from"/}
+                    lower=$(printf '%s' "$rel" | tr '[:upper:]' '[:lower:]')
+                    case "$lower" in
+                        3_intelligences/reports/*) plan_file "$file" "$rel" ;;
+                    esac
+                done
+            fi
+            ;;
+        reports)
+            if [ -d "$from/3_intelligences" ]; then
+                find "$from/3_intelligences" -type f ! -name '*.md' 2>/dev/null | sort | while IFS= read -r file; do
+                    rel=${file#"$from"/}
+                    lower=$(printf '%s' "$rel" | tr '[:upper:]' '[:lower:]')
+                    case "$lower" in
+                        3_intelligences/reports/*) plan_file "$file" "$rel" ;;
+                    esac
                 done
             fi
             ;;
@@ -476,6 +494,16 @@ sanitize_migrated_status() {
     record metadata "$old_rel" "$new_rel" "status normalized from ${current_status} to ${default_status}"
 }
 
+raw_report_artifact() {
+    local lower
+    lower=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+    case "$lower" in
+        3_intelligences/reports/*.md) return 1 ;;
+        3_intelligences/reports/*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 candidate_count=0
 existing_count=0
 written_count=0
@@ -487,9 +515,13 @@ while IFS="$(printf '\t')" read -r old_abs old_rel new_rel; do
         printf 'migration progress: %s candidates processed\n' "$candidate_count" >&2
     fi
     content="$content_dir/$candidate_count"
-    rewrite_links "$old_abs" "$old_rel" "$new_rel" "$content"
-    inject_display_metadata "$content" "$old_rel" "$new_rel"
-    sanitize_migrated_status "$content" "$old_rel" "$new_rel"
+    if raw_report_artifact "$old_rel"; then
+        cp "$old_abs" "$content"
+    else
+        rewrite_links "$old_abs" "$old_rel" "$new_rel" "$content"
+        inject_display_metadata "$content" "$old_rel" "$new_rel"
+        sanitize_migrated_status "$content" "$old_rel" "$new_rel"
+    fi
 
     target="$to/$new_rel"
     if [ -f "$target" ]; then

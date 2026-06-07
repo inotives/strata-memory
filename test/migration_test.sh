@@ -45,7 +45,9 @@ mkdir -p \
     "$OLD/2_knowledges/Entities/Work" \
     "$OLD/0_configs/rules" \
     "$OLD/1_drafts/Sessions" \
-    "$OLD/3_intelligences/Skills/Coding/Review"
+    "$OLD/3_intelligences/Skills/Coding/Review" \
+    "$OLD/3_intelligences/Reports/Researches" \
+    "$OLD/3_intelligences/Reports/Theses/AAPL/Bull"
 
 cat > "$OLD/2_knowledges/Concepts/Alpha Note.md" <<EOF
 ---
@@ -118,6 +120,14 @@ cat > "$OLD/3_intelligences/Skills/Coding/Review/SKILL.md" <<'EOF'
 # Review Skill
 EOF
 
+cat > "$OLD/3_intelligences/Reports/Researches/Market Close.html" <<'EOF'
+<html><body><h1>Market Close</h1></body></html>
+EOF
+
+cat > "$OLD/3_intelligences/Reports/Theses/AAPL/Bull/2026-05-15.json" <<'EOF'
+{"ticker":"AAPL","stance":"bull"}
+EOF
+
 cat > "$OLD/AGENTS.md" <<'EOF'
 # Legacy Agents
 EOF
@@ -176,6 +186,17 @@ esac
 
 "${VAULT}/0_core/script/migration.sh" --from "$OLD" --to "$VAULT" --section intelligence >/dev/null
 assert_file "$VAULT/3_intelligence/skill/coding/review/skill.md"
+assert_file "$VAULT/3_intelligence/report/research/market-close.html"
+assert_file "$VAULT/3_intelligence/report/theses/aapl/bull/2026-05-15.json"
+assert_contains "$VAULT/3_intelligence/report/research/market-close.html" '<h1>Market Close</h1>'
+assert_contains "$VAULT/3_intelligence/report/theses/aapl/bull/2026-05-15.json" '"stance":"bull"'
+
+REPORTS_VAULT="${WORK}/vault-reports"
+"${ROOT}/install.sh" --vault "$REPORTS_VAULT" >/dev/null
+"${REPORTS_VAULT}/0_core/script/migration.sh" --from "$OLD" --to "$REPORTS_VAULT" --section reports >/dev/null
+assert_file "$REPORTS_VAULT/3_intelligence/report/research/market-close.html"
+assert_file "$REPORTS_VAULT/3_intelligence/report/theses/aapl/bull/2026-05-15.json"
+assert_missing "$REPORTS_VAULT/3_intelligence/skill/coding/review/skill.md"
 
 "${VAULT}/0_core/script/migration.sh" --from "$OLD" --to "$VAULT" --section agents-md >/dev/null
 assert_file "$VAULT/3_intelligence/agent/legacy-agents.md"
@@ -194,6 +215,7 @@ esac
 assert_file "$ALL_VAULT/2_knowledge/concept/alpha-note.md"
 assert_file "$ALL_VAULT/2_knowledge/_unmapped/config/rules/knowledge-management.md"
 assert_file "$ALL_VAULT/3_intelligence/skill/coding/review/skill.md"
+assert_file "$ALL_VAULT/3_intelligence/report/research/market-close.html"
 assert_file "$ALL_VAULT/3_intelligence/agent/legacy-agents.md"
 
 COLLIDE="${WORK}/old-collide"
