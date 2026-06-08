@@ -46,6 +46,7 @@ Core commands are namespaced in generated command tables.
 | `strata:doctor` | Check vault health, dependencies, config, schema, rooms, tags, and generated files. |
 | `strata:index` | Index target files or run a full scan. |
 | `strata:search` | Search indexed memory. |
+| `strata:link-review` | Review invalid or broken vault links. |
 | `strata:promote` | Promote drafts into knowledge or intelligence. |
 | `strata:tag-review` | Review unknown or similar tags. |
 | `strata:room-review` | Review unregistered rooms. |
