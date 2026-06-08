@@ -43,6 +43,7 @@ EOF
 
 "${VAULT}/0_core/script/agents-generate.sh" --vault "$VAULT" >/dev/null
 assert_contains "${VAULT}/AGENTS.md" '# Strata-Memory'
+assert_contains "${VAULT}/AGENTS.md" '0_core/template/draft/research-draft.md'
 assert_contains "${VAULT}/AGENTS.md" 'Profile: `coder`'
 assert_contains "${VAULT}/AGENTS.md" '- `entity/project/*`'
 assert_contains "${VAULT}/AGENTS.md" '- `entity/tool/*`'

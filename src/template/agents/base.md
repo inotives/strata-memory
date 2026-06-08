@@ -10,6 +10,10 @@ Strata-Memory is a local-first three-tier memory wiki for agentic work. Numbered
 
 **Main configuration:** `0_core/config/configs.yaml`
 
+## Draft Research
+
+Research drafts should start from the managed template at `0_core/template/draft/research-draft.md`. Preserve its frontmatter fields when creating or refining deep-research notes.
+
 ## Critical Rules
 
 - Do not delete `~/.strata-memory`; it is the private memory vault.

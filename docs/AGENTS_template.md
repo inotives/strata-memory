@@ -57,6 +57,8 @@ Index useful docs/templates, but ignore DB files, cache, temp files, and test te
 
 Unverified working material. Drafts may be incomplete and may have empty descriptions.
 
+Research drafts should start from the managed template at `0_core/template/draft/research-draft.md`. Preserve its frontmatter fields when creating or refining deep-research notes.
+
 Default rooms:
 
 ```text
