@@ -138,7 +138,7 @@ strata index [--target FILE | --full] --vault PATH [--json]
 strata search --query TEXT --vault PATH [--limit N] [--include-archived] [--paths-only] [--json]
 strata link-review --vault PATH [--json]
 strata normalize --target FILE --vault PATH [--check] [--json]
-strata promote --source FILE --to 2_knowledge|3_intelligence [--new-slug SLUG] --vault PATH [--json]
+strata promote --source FILE --to 2_knowledge[/ROOM]|3_intelligence[/ROOM] [--new-slug SLUG] --vault PATH [--json]
 strata retention --vault PATH [--apply] [--json]
 strata doctor --vault PATH [--json]
 strata tag-review --vault PATH [--json]
@@ -164,13 +164,15 @@ Use the installed Rust CLI for runtime commands.
 | `strata search --query TEXT --vault PATH [--limit N] [--include-archived] [--paths-only] [--json]` | Search indexed memory with SQLite FTS5. |
 | `strata link-review --vault PATH [--json]` | Review local Markdown links. Broken durable links are blocking errors. |
 | `strata normalize --target FILE --vault PATH [--check] [--json]` | Normalize constrained Markdown frontmatter. |
-| `strata promote --source FILE --to 2_knowledge\|3_intelligence [--new-slug SLUG] --vault PATH [--json]` | Promote a draft into a durable tier and archive the original. |
+| `strata promote --source FILE --to 2_knowledge[/ROOM]\|3_intelligence[/ROOM] [--new-slug SLUG] --vault PATH [--json]` | Promote a draft into a durable tier or concrete room and archive the original. |
 | `strata retention --vault PATH [--apply] [--json]` | Report or delete archived drafts past retention policy. |
 | `strata doctor --vault PATH [--json]` | Check vault health without mutating files. |
 | `strata tag-review --vault PATH [--json]` | Review frontmatter tags against allowed tags. |
 | `strata room-review --vault PATH [--json]` | Report files outside registered room patterns. |
 | `strata privacy-review --vault PATH [--json]` | Report local-path and privacy warnings. |
 | `0_core/script/migration.sh --from PATH --to PATH --section NAME\|--all [--json]` | One-off legacy Agent Memory migration helper. |
+
+`strata promote --to 2_knowledge` and `--to 3_intelligence` preserve the draft subfolder. For example, `1_draft/research/foo.md` promotes to `2_knowledge/research/foo.md`. Passing a concrete room such as `--to 2_knowledge/entity/website` promotes directly into that room.
 
 ## Draft Templates
 
