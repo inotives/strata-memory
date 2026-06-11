@@ -19,6 +19,7 @@ pub(crate) enum Command {
     Init,
     ConfigCompile,
     Normalize(NormalizeArgs),
+    Promote(PromoteArgs),
     Retention(RetentionArgs),
 }
 
@@ -45,6 +46,13 @@ pub(crate) struct NormalizeArgs {
 #[derive(Debug)]
 pub(crate) struct RetentionArgs {
     pub(crate) apply: bool,
+}
+
+#[derive(Debug)]
+pub(crate) struct PromoteArgs {
+    pub(crate) source: PathBuf,
+    pub(crate) to: String,
+    pub(crate) new_slug: Option<String>,
 }
 
 pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
@@ -232,6 +240,36 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
             }
             Command::Retention(RetentionArgs { apply })
         }
+        "promote" => {
+            let mut source: Option<PathBuf> = None;
+            let mut to: Option<String> = None;
+            let mut new_slug: Option<String> = None;
+            while let Some(arg) = iter.next() {
+                match arg.as_str() {
+                    "--source" => {
+                        let value = iter.next().ok_or("--source requires FILE")?;
+                        source = Some(PathBuf::from(value));
+                    }
+                    "--to" => {
+                        to = Some(iter.next().ok_or("--to requires TIER")?);
+                    }
+                    "--new-slug" => {
+                        new_slug = Some(iter.next().ok_or("--new-slug requires SLUG")?);
+                    }
+                    "--vault" => {
+                        let value = iter.next().ok_or("--vault requires PATH")?;
+                        vault = PathBuf::from(value);
+                    }
+                    "--json" => json = true,
+                    other => return Err(format!("unknown argument: {other}").into()),
+                }
+            }
+            Command::Promote(PromoteArgs {
+                source: source.ok_or("missing --source")?,
+                to: to.ok_or("missing --to")?,
+                new_slug,
+            })
+        }
         _ => return Err(format!("unknown command: {command}").into()),
     };
 
@@ -251,6 +289,7 @@ fn print_usage() {
     println!("       strata init [--vault PATH] [--json]");
     println!("       strata config-compile [--vault PATH] [--json]");
     println!("       strata normalize --target FILE [--vault PATH] [--check] [--json]");
+    println!("       strata promote --source FILE --to 2_knowledge|3_intelligence [--new-slug SLUG] [--vault PATH] [--json]");
     println!("       strata retention [--vault PATH] [--apply] [--json]");
 }
 

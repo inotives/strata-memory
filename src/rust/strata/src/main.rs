@@ -166,6 +166,29 @@ fn run() -> Result<()> {
                 Err(err) => return Err(err),
             }
         }
+        Command::Promote(args) => {
+            let summary =
+                lifecycle::promote(&cli.vault, &args.source, &args.to, args.new_slug.as_deref())?;
+            index(
+                &cli.vault,
+                IndexMode::Target(cli.vault.join(&summary.target)),
+            )?;
+            index(
+                &cli.vault,
+                IndexMode::Target(cli.vault.join(&summary.archive)),
+            )?;
+            if cli.json {
+                println!(
+                    "{{\"ok\":true,\"target\":\"{}\",\"archive\":\"{}\",\"log\":\"{}\"}}",
+                    json_escape(&summary.target),
+                    json_escape(&summary.archive),
+                    json_escape(&summary.log)
+                );
+            } else {
+                println!("Promoted: {}", summary.target);
+                println!("Archived: {}", summary.archive);
+            }
+        }
         Command::Retention(args) => {
             let summary = lifecycle::retention(&cli.vault, args.apply)?;
             if cli.json {

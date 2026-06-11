@@ -19,6 +19,12 @@ pub(crate) struct RetentionSummary {
     pub(crate) skipped_count: usize,
 }
 
+pub(crate) struct PromoteSummary {
+    pub(crate) target: String,
+    pub(crate) archive: String,
+    pub(crate) log: String,
+}
+
 #[derive(Serialize)]
 struct RetentionReport {
     ok: bool,
@@ -234,6 +240,250 @@ pub(crate) fn retention(vault: &Path, apply: bool) -> Result<RetentionSummary> {
         kept_count,
         skipped_count,
     })
+}
+
+pub(crate) fn promote(
+    vault: &Path,
+    source: &Path,
+    to: &str,
+    new_slug: Option<&str>,
+) -> Result<PromoteSummary> {
+    if !matches!(to, "2_knowledge" | "3_intelligence") {
+        return Err("--to must be 2_knowledge or 3_intelligence".into());
+    }
+    if !source.is_file() {
+        return Err(format!("source not found: {}", source.to_string_lossy()).into());
+    }
+
+    let source_abs = absolute_path(source)?;
+    let Some(source_rel) = rel_path(&source_abs, vault) else {
+        return Err(format!(
+            "source must be under 1_draft: {}",
+            source_abs.to_string_lossy()
+        )
+        .into());
+    };
+    if !source_rel.starts_with("1_draft/") {
+        return Err(format!("source must be under 1_draft: {source_rel}").into());
+    }
+    let draft_subpath = source_rel.trim_start_matches("1_draft/");
+    if draft_subpath.starts_with("_archived/") {
+        return Err(format!("archived drafts cannot be promoted: {source_rel}").into());
+    }
+
+    let content = fs::read_to_string(&source_abs)?;
+    let parsed = ParsedMarkdown::parse(&content);
+    let description = parsed.scalar("description").unwrap_or_default();
+    if description.is_empty() {
+        return Err(format!("description is required before promotion: {source_rel}").into());
+    }
+    let status = parsed.scalar("status").unwrap_or_default();
+    if !status.is_empty() && status != "pending" {
+        return Err(format!("only pending drafts can be promoted: {source_rel}").into());
+    }
+
+    let draft_path = Path::new(draft_subpath);
+    let draft_dir = draft_path
+        .parent()
+        .map(|path| path.to_string_lossy().to_string())
+        .unwrap_or_else(|| ".".to_string());
+    let mut draft_base = draft_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or("invalid draft filename")?
+        .to_string();
+    if let Some(slug) = new_slug {
+        validate_new_slug(slug)?;
+        draft_base = if slug.ends_with(".md") {
+            slug.to_string()
+        } else {
+            format!("{slug}.md")
+        };
+    }
+
+    let target_rel = format!("{to}/{draft_dir}/{draft_base}");
+    let archive_rel = format!("1_draft/_archived/{draft_subpath}");
+    let target_abs = vault.join(&target_rel);
+    let archive_abs = vault.join(&archive_rel);
+    if target_abs.exists() {
+        return Err(format!("target exists; use --new-slug: {target_rel}").into());
+    }
+    if archive_abs.exists() {
+        return Err(format!("archive target exists: {archive_rel}").into());
+    }
+
+    let now = Utc::now();
+    let promoted = build_promote_candidate(
+        &parsed,
+        &source_abs,
+        &description,
+        to,
+        "verified",
+        &target_rel,
+        &archive_rel,
+        None,
+        now,
+    )?;
+    let archived = build_promote_candidate(
+        &parsed,
+        &source_abs,
+        &description,
+        "1_draft",
+        "archived",
+        &archive_rel,
+        &archive_rel,
+        Some(&source_rel),
+        now,
+    )?;
+
+    validate_candidate(
+        &promoted,
+        "2_knowledge",
+        "promoted candidate failed normalization",
+    )?;
+    validate_candidate(
+        &archived,
+        "1_draft",
+        "archived candidate failed normalization",
+    )?;
+
+    fs::create_dir_all(target_abs.parent().ok_or("invalid target path")?)?;
+    fs::create_dir_all(archive_abs.parent().ok_or("invalid archive path")?)?;
+    fs::create_dir_all(vault.join("3_intelligence/report/operation"))?;
+    fs::write(&target_abs, promoted)?;
+    fs::write(&archive_abs, archived)?;
+    fs::remove_file(&source_abs)?;
+
+    let log_rel = format!(
+        "3_intelligence/report/operation/promote-{}.json",
+        now.format("%Y%m%d-%H%M%S")
+    );
+    let log_abs = vault.join(&log_rel);
+    let log = serde_json::json!({
+        "ok": true,
+        "source": source_rel,
+        "target": target_rel,
+        "archive": archive_rel,
+    });
+    fs::write(&log_abs, serde_json::to_string(&log)?)?;
+
+    Ok(PromoteSummary {
+        target: log["target"].as_str().unwrap_or_default().to_string(),
+        archive: log["archive"].as_str().unwrap_or_default().to_string(),
+        log: log_rel,
+    })
+}
+
+fn validate_new_slug(slug: &str) -> Result<()> {
+    if slug.is_empty()
+        || !slug.chars().all(|ch| {
+            ch.is_ascii_lowercase() || ch.is_ascii_digit() || matches!(ch, '.' | '_' | '-')
+        })
+    {
+        return Err(
+            "--new-slug must use lowercase letters, numbers, dot, underscore, or dash".into(),
+        );
+    }
+    Ok(())
+}
+
+fn build_promote_candidate(
+    parsed: &ParsedMarkdown,
+    source_abs: &Path,
+    description: &str,
+    strata: &str,
+    status: &str,
+    rel_for_id: &str,
+    archive_rel: &str,
+    archived_from: Option<&str>,
+    now: chrono::DateTime<Utc>,
+) -> Result<String> {
+    let mut id = parsed.scalar("id").unwrap_or_else(|| make_id(rel_for_id));
+    if archived_from.is_some() {
+        id.push_str("_archived");
+    }
+    let title = parsed
+        .scalar("title")
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| {
+            Path::new(rel_for_id)
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .unwrap_or("untitled")
+                .replace('-', " ")
+        });
+    let tags = parsed.array_block("tags");
+    let sources = parsed.array_block("sources");
+    let source_note = parsed.scalar("source_note");
+    let version = parsed.scalar("version").unwrap_or_else(|| "1".to_string());
+    let created = parsed
+        .scalar("created")
+        .unwrap_or_else(|| Utc::now().format("%Y-%m-%d").to_string());
+    let last_edit_summary = parsed.scalar("last_edit_summary");
+    let now_rfc3339 = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+    let mut output = String::new();
+    output.push_str("---\n");
+    push_quoted(&mut output, "id", &id);
+    push_quoted(&mut output, "title", &title);
+    push_quoted(&mut output, "description", description);
+    push_quoted(&mut output, "strata", strata);
+    push_quoted(&mut output, "status", status);
+    push_block_or_key(&mut output, tags.as_deref(), "tags");
+    if matches!(strata, "2_knowledge" | "3_intelligence") {
+        output.push_str("sources:\n");
+        output.push_str(&format!("  - \"{}\"\n", yaml_quote_escape(archive_rel)));
+        if let Some(source_note) = source_note.as_deref().filter(|value| !value.is_empty()) {
+            push_quoted(&mut output, "source_note", source_note);
+        } else {
+            push_quoted(&mut output, "source_note", "Promoted from archived draft.");
+        }
+        push_quoted(&mut output, "promoted_at", &now_rfc3339);
+    } else if let Some(sources) = sources {
+        output.push_str(&sources);
+        if !sources.ends_with('\n') {
+            output.push('\n');
+        }
+    }
+    output.push_str(&format!("version: {version}\n"));
+    if let Some(summary) = last_edit_summary
+        .as_deref()
+        .filter(|value| !value.is_empty())
+    {
+        push_quoted(&mut output, "last_edit_summary", summary);
+    }
+    push_quoted(&mut output, "created", &created);
+    push_quoted(
+        &mut output,
+        "modified",
+        &Utc::now().format("%Y-%m-%d").to_string(),
+    );
+    if let Some(archived_from) = archived_from {
+        push_quoted(&mut output, "archived_at", &now_rfc3339);
+        push_quoted(
+            &mut output,
+            "archived_reason",
+            &format!("Promoted to {rel_for_id}."),
+        );
+        push_quoted(&mut output, "archived_from", archived_from);
+    }
+    output.push_str("---\n");
+    output.push_str(&parsed.body);
+
+    if !source_abs.is_file() {
+        return Err("source disappeared during promotion".into());
+    }
+    Ok(output)
+}
+
+fn validate_candidate(content: &str, strata: &str, message: &str) -> Result<()> {
+    let parsed = ParsedMarkdown::parse(content);
+    if matches!(strata, "2_knowledge" | "3_intelligence")
+        && parsed.scalar("description").unwrap_or_default().is_empty()
+    {
+        return Err(message.to_string().into());
+    }
+    Ok(())
 }
 
 fn retention_record(
