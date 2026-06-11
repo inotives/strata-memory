@@ -100,6 +100,9 @@ fn run() -> Result<()> {
         Command::TagReview => {
             review::tag_review(&cli.vault, cli.json)?;
         }
+        Command::RoomReview => {
+            review::room_review(&cli.vault, cli.json)?;
+        }
         Command::DbMigrate => {
             let applied = db::migrate(&cli.vault)?;
             let db_path = cli.vault.join("0_core/db/strata.db");

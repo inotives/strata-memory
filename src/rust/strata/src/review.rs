@@ -171,6 +171,59 @@ pub(crate) fn tag_review(vault: &Path, json: bool) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn room_review(vault: &Path, json: bool) -> Result<()> {
+    let patterns = config::room_patterns(vault)?;
+    let files = collect_review_markdown_files(vault)?;
+    let mut unregistered = Vec::new();
+
+    for file in files {
+        let abs = absolute_path(&file)?;
+        let Some(rel) = rel_path(&abs, vault) else {
+            continue;
+        };
+        if !is_strata_path(&rel) {
+            continue;
+        }
+        let room = Path::new(&rel)
+            .parent()
+            .map(|path| path.to_string_lossy().to_string())
+            .unwrap_or_else(|| ".".to_string());
+        if !patterns
+            .iter()
+            .any(|pattern| room_matches_pattern(&room, pattern))
+        {
+            unregistered.push(UnregisteredRoom { path: rel, room });
+        }
+    }
+
+    if json {
+        print!(
+            "{{\"ok\":true,\"unregistered_count\":{},\"unregistered\":[",
+            unregistered.len()
+        );
+        for (idx, item) in unregistered.iter().enumerate() {
+            if idx > 0 {
+                print!(",");
+            }
+            print!(
+                "{{\"path\":\"{}\",\"room\":\"{}\"}}",
+                json_escape(&item.path),
+                json_escape(&item.room)
+            );
+        }
+        println!("]}}");
+    } else if unregistered.is_empty() {
+        println!("No unregistered rooms found");
+    } else {
+        println!("Unregistered rooms:");
+        for item in &unregistered {
+            println!("{}: {}", item.path, item.room);
+        }
+    }
+
+    Ok(())
+}
+
 fn collect_review_markdown_files(vault: &Path) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     for rel in ["1_draft", "2_knowledge", "3_intelligence"] {
@@ -263,6 +316,26 @@ struct UnknownTag {
     path: String,
     tag: String,
     similar: String,
+}
+
+#[derive(Debug)]
+struct UnregisteredRoom {
+    path: String,
+    room: String,
+}
+
+fn is_strata_path(path: &str) -> bool {
+    path.starts_with("1_draft/")
+        || path.starts_with("2_knowledge/")
+        || path.starts_with("3_intelligence/")
+}
+
+fn room_matches_pattern(room: &str, pattern: &str) -> bool {
+    if let Some(prefix) = pattern.strip_suffix('*') {
+        room.starts_with(prefix)
+    } else {
+        room == pattern || room.starts_with(&format!("{pattern}/"))
+    }
 }
 
 fn extract_frontmatter_tags(content: &str) -> Vec<String> {

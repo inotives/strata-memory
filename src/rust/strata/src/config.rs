@@ -96,6 +96,18 @@ pub(crate) fn allowed_tags(vault: &Path) -> Result<Vec<String>> {
     Ok(tags)
 }
 
+pub(crate) fn room_patterns(vault: &Path) -> Result<Vec<String>> {
+    let config = read_config(vault)?;
+    let mut patterns = Vec::new();
+    for (tier, tier_rooms) in config.rooms {
+        for room in tier_rooms {
+            patterns.push(format!("{tier}/{}", room.path));
+        }
+    }
+    patterns.sort();
+    Ok(patterns)
+}
+
 fn read_config(vault: &Path) -> Result<Config> {
     let config_path = vault.join("0_core/config/configs.yaml");
     if !config_path.is_file() {

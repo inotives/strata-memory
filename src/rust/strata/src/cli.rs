@@ -17,6 +17,7 @@ pub(crate) enum Command {
     LinkReview,
     PrivacyReview,
     TagReview,
+    RoomReview,
     DbMigrate,
     Init,
     ConfigCompile,
@@ -191,6 +192,19 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
             }
             Command::TagReview
         }
+        "room-review" => {
+            while let Some(arg) = iter.next() {
+                match arg.as_str() {
+                    "--vault" => {
+                        let value = iter.next().ok_or("--vault requires PATH")?;
+                        vault = PathBuf::from(value);
+                    }
+                    "--json" => json = true,
+                    other => return Err(format!("unknown argument: {other}").into()),
+                }
+            }
+            Command::RoomReview
+        }
         "db-migrate" => {
             while let Some(arg) = iter.next() {
                 match arg.as_str() {
@@ -315,6 +329,7 @@ fn print_usage() {
     println!("       strata link-review [--vault PATH] [--json]");
     println!("       strata privacy-review [--vault PATH] [--json]");
     println!("       strata tag-review [--vault PATH] [--json]");
+    println!("       strata room-review [--vault PATH] [--json]");
     println!("       strata db-migrate [--vault PATH] [--json]");
     println!("       strata init [--vault PATH] [--json]");
     println!("       strata config-compile [--vault PATH] [--json]");
