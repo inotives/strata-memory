@@ -2,6 +2,7 @@ mod agents;
 mod cli;
 mod config;
 mod db;
+mod doctor;
 mod lifecycle;
 mod review;
 mod vault;
@@ -102,6 +103,9 @@ fn run() -> Result<()> {
         }
         Command::RoomReview => {
             review::room_review(&cli.vault, cli.json)?;
+        }
+        Command::Doctor => {
+            doctor::run(&cli.vault, cli.json)?;
         }
         Command::DbMigrate => {
             let applied = db::migrate(&cli.vault)?;

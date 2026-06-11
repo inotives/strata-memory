@@ -3,27 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub(crate) fn link_review(vault: &Path, json: bool) -> Result<()> {
-    let files = collect_review_markdown_files(vault)?;
-    let mut issues = Vec::new();
-
-    for file in files {
-        let abs = absolute_path(&file)?;
-        let Some(rel) = rel_path(&abs, vault) else {
-            continue;
-        };
-        let content = fs::read_to_string(&abs)?;
-        for link in extract_review_links(&content) {
-            if let Some(reason) = link_issue_reason(vault, &rel, &link) {
-                issues.push(LinkIssue {
-                    severity: severity_for_path(&rel).to_string(),
-                    reason,
-                    path: rel.clone(),
-                    target: link.target,
-                    line: link.line,
-                });
-            }
-        }
-    }
+    let issues = link_issues(vault)?;
 
     let error_count = issues
         .iter()
@@ -68,6 +48,15 @@ pub(crate) fn link_review(vault: &Path, json: bool) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub(crate) fn link_review_counts(vault: &Path) -> Result<(usize, usize)> {
+    let issues = link_issues(vault)?;
+    let error_count = issues
+        .iter()
+        .filter(|issue| issue.severity == "error")
+        .count();
+    Ok((issues.len(), error_count))
 }
 
 pub(crate) fn privacy_review(vault: &Path, json: bool) -> Result<()> {
@@ -117,26 +106,7 @@ pub(crate) fn privacy_review(vault: &Path, json: bool) -> Result<()> {
 }
 
 pub(crate) fn tag_review(vault: &Path, json: bool) -> Result<()> {
-    let allowed = config::allowed_tags(vault)?;
-    let files = collect_review_markdown_files(vault)?;
-    let mut unknown = Vec::new();
-
-    for file in files {
-        let abs = absolute_path(&file)?;
-        let Some(rel) = rel_path(&abs, vault) else {
-            continue;
-        };
-        let content = fs::read_to_string(&abs)?;
-        for tag in extract_frontmatter_tags(&content) {
-            if let Some(similar) = unknown_tag_similar(&tag, &allowed) {
-                unknown.push(UnknownTag {
-                    path: rel.clone(),
-                    tag,
-                    similar,
-                });
-            }
-        }
-    }
+    let unknown = unknown_tags(vault)?;
 
     if json {
         print!(
@@ -171,30 +141,12 @@ pub(crate) fn tag_review(vault: &Path, json: bool) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn room_review(vault: &Path, json: bool) -> Result<()> {
-    let patterns = config::room_patterns(vault)?;
-    let files = collect_review_markdown_files(vault)?;
-    let mut unregistered = Vec::new();
+pub(crate) fn unknown_tag_count(vault: &Path) -> Result<usize> {
+    Ok(unknown_tags(vault)?.len())
+}
 
-    for file in files {
-        let abs = absolute_path(&file)?;
-        let Some(rel) = rel_path(&abs, vault) else {
-            continue;
-        };
-        if !is_strata_path(&rel) {
-            continue;
-        }
-        let room = Path::new(&rel)
-            .parent()
-            .map(|path| path.to_string_lossy().to_string())
-            .unwrap_or_else(|| ".".to_string());
-        if !patterns
-            .iter()
-            .any(|pattern| room_matches_pattern(&room, pattern))
-        {
-            unregistered.push(UnregisteredRoom { path: rel, room });
-        }
-    }
+pub(crate) fn room_review(vault: &Path, json: bool) -> Result<()> {
+    let unregistered = unregistered_rooms(vault)?;
 
     if json {
         print!(
@@ -222,6 +174,10 @@ pub(crate) fn room_review(vault: &Path, json: bool) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub(crate) fn unregistered_room_count(vault: &Path) -> Result<usize> {
+    Ok(unregistered_rooms(vault)?.len())
 }
 
 fn collect_review_markdown_files(vault: &Path) -> Result<Vec<PathBuf>> {
@@ -279,6 +235,85 @@ fn is_privacy_review_file(path: &Path) -> bool {
         path.extension().and_then(|value| value.to_str()),
         Some("md" | "txt" | "yaml" | "yml" | "json")
     )
+}
+
+fn link_issues(vault: &Path) -> Result<Vec<LinkIssue>> {
+    let files = collect_review_markdown_files(vault)?;
+    let mut issues = Vec::new();
+
+    for file in files {
+        let abs = absolute_path(&file)?;
+        let Some(rel) = rel_path(&abs, vault) else {
+            continue;
+        };
+        let content = fs::read_to_string(&abs)?;
+        for link in extract_review_links(&content) {
+            if let Some(reason) = link_issue_reason(vault, &rel, &link) {
+                issues.push(LinkIssue {
+                    severity: severity_for_path(&rel).to_string(),
+                    reason,
+                    path: rel.clone(),
+                    target: link.target,
+                    line: link.line,
+                });
+            }
+        }
+    }
+
+    Ok(issues)
+}
+
+fn unknown_tags(vault: &Path) -> Result<Vec<UnknownTag>> {
+    let allowed = config::allowed_tags(vault)?;
+    let files = collect_review_markdown_files(vault)?;
+    let mut unknown = Vec::new();
+
+    for file in files {
+        let abs = absolute_path(&file)?;
+        let Some(rel) = rel_path(&abs, vault) else {
+            continue;
+        };
+        let content = fs::read_to_string(&abs)?;
+        for tag in extract_frontmatter_tags(&content) {
+            if let Some(similar) = unknown_tag_similar(&tag, &allowed) {
+                unknown.push(UnknownTag {
+                    path: rel.clone(),
+                    tag,
+                    similar,
+                });
+            }
+        }
+    }
+
+    Ok(unknown)
+}
+
+fn unregistered_rooms(vault: &Path) -> Result<Vec<UnregisteredRoom>> {
+    let patterns = config::room_patterns(vault)?;
+    let files = collect_review_markdown_files(vault)?;
+    let mut unregistered = Vec::new();
+
+    for file in files {
+        let abs = absolute_path(&file)?;
+        let Some(rel) = rel_path(&abs, vault) else {
+            continue;
+        };
+        if !is_strata_path(&rel) {
+            continue;
+        }
+        let room = Path::new(&rel)
+            .parent()
+            .map(|path| path.to_string_lossy().to_string())
+            .unwrap_or_else(|| ".".to_string());
+        if !patterns
+            .iter()
+            .any(|pattern| room_matches_pattern(&room, pattern))
+        {
+            unregistered.push(UnregisteredRoom { path: rel, room });
+        }
+    }
+
+    Ok(unregistered)
 }
 
 #[derive(Debug)]
