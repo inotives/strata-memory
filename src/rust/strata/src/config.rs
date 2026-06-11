@@ -63,23 +63,7 @@ pub(crate) struct CompileSummary {
 }
 
 pub(crate) fn profile_tier2_rooms(vault: &Path) -> Result<(String, Vec<String>)> {
-    let config_path = vault.join("0_core/config/configs.yaml");
-    if !config_path.is_file() {
-        return Err(format!("missing config: {}", config_path.to_string_lossy()).into());
-    }
-
-    let yaml = fs::read_to_string(&config_path).map_err(|err| {
-        format!(
-            "Unable to parse config YAML: {}: {err}",
-            config_path.display()
-        )
-    })?;
-    let config: Config = serde_yaml::from_str(&yaml).map_err(|err| {
-        format!(
-            "Unable to parse config YAML: {}: {err}",
-            config_path.display()
-        )
-    })?;
+    let config = read_config(vault)?;
     let profile = if config.profile.is_empty() {
         "default".to_string()
     } else {
@@ -92,6 +76,39 @@ pub(crate) fn profile_tier2_rooms(vault: &Path) -> Result<(String, Vec<String>)>
         .unwrap_or_default();
 
     Ok((profile, rooms))
+}
+
+pub(crate) fn retention_archived_drafts_days(vault: &Path) -> Result<i64> {
+    let config = read_config(vault)?;
+    if config.retention.archived_drafts_days < 1 {
+        return Err(format!(
+            "Invalid retention.archived_drafts_days: {}",
+            config.retention.archived_drafts_days
+        )
+        .into());
+    }
+    Ok(config.retention.archived_drafts_days)
+}
+
+fn read_config(vault: &Path) -> Result<Config> {
+    let config_path = vault.join("0_core/config/configs.yaml");
+    if !config_path.is_file() {
+        return Err(format!("missing config: {}", config_path.to_string_lossy()).into());
+    }
+
+    let yaml = fs::read_to_string(&config_path).map_err(|err| {
+        format!(
+            "Unable to parse config YAML: {}: {err}",
+            config_path.display()
+        )
+    })?;
+    serde_yaml::from_str(&yaml).map_err(|err| {
+        format!(
+            "Unable to parse config YAML: {}: {err}",
+            config_path.display()
+        )
+        .into()
+    })
 }
 
 pub(crate) fn compile(vault: &Path) -> Result<CompileSummary> {

@@ -1,5 +1,6 @@
-use crate::{absolute_path, json_escape, posix_cksum, rel_path, Result};
-use chrono::Utc;
+use crate::{absolute_path, config, json_escape, posix_cksum, rel_path, Result};
+use chrono::{DateTime, Utc};
+use serde::Serialize;
 use std::fs;
 use std::path::Path;
 
@@ -7,6 +8,37 @@ pub(crate) struct NormalizeSummary {
     pub(crate) path: String,
     pub(crate) strata: String,
     pub(crate) status: String,
+}
+
+pub(crate) struct RetentionSummary {
+    pub(crate) report: String,
+    pub(crate) mode: String,
+    pub(crate) candidate_count: usize,
+    pub(crate) deleted_count: usize,
+    pub(crate) kept_count: usize,
+    pub(crate) skipped_count: usize,
+}
+
+#[derive(Serialize)]
+struct RetentionReport {
+    ok: bool,
+    generated_at: String,
+    mode: String,
+    retention_days: i64,
+    candidate_count: usize,
+    deleted_count: usize,
+    kept_count: usize,
+    skipped_count: usize,
+    records: Vec<RetentionRecord>,
+}
+
+#[derive(Serialize)]
+struct RetentionRecord {
+    action: String,
+    path: String,
+    archived_at: String,
+    age_days: Option<i64>,
+    reason: String,
 }
 
 pub(crate) fn normalize(vault: &Path, target: &Path, check: bool) -> Result<NormalizeSummary> {
@@ -96,6 +128,150 @@ pub(crate) fn normalize(vault: &Path, target: &Path, check: bool) -> Result<Norm
         strata: strata.to_string(),
         status,
     })
+}
+
+pub(crate) fn retention(vault: &Path, apply: bool) -> Result<RetentionSummary> {
+    let days = config::retention_archived_drafts_days(vault)?;
+    let archive_root = vault.join("1_draft/_archived");
+    let report_dir = vault.join("3_intelligence/report/maintenance");
+    fs::create_dir_all(&report_dir)?;
+    fs::create_dir_all(vault.join("0_core/tmp"))?;
+
+    let now = Utc::now();
+    let mut records = Vec::new();
+    if archive_root.is_dir() {
+        let mut files = Vec::new();
+        collect_markdown_files(&archive_root, &mut files)?;
+        files.sort();
+        for file in files {
+            let abs = absolute_path(&file)?;
+            let rel = rel_path(&abs, vault).unwrap_or_else(|| abs.to_string_lossy().to_string());
+            let content = fs::read_to_string(&abs)?;
+            let parsed = ParsedMarkdown::parse(&content);
+            let archived_at = parsed.scalar("archived_at").unwrap_or_default();
+            if archived_at.is_empty() {
+                records.push(retention_record(
+                    "skipped",
+                    rel,
+                    "",
+                    None,
+                    "missing_archived_at",
+                ));
+                continue;
+            }
+
+            let Ok(archived_at_time) = DateTime::parse_from_rfc3339(&archived_at) else {
+                records.push(retention_record(
+                    "skipped",
+                    rel,
+                    &archived_at,
+                    None,
+                    "invalid_archived_at",
+                ));
+                continue;
+            };
+            let age_days = (now.timestamp() - archived_at_time.timestamp()) / 86_400;
+            if age_days < days {
+                records.push(retention_record(
+                    "kept",
+                    rel,
+                    &archived_at,
+                    Some(age_days),
+                    "within_retention",
+                ));
+                continue;
+            }
+
+            if apply {
+                fs::remove_file(&abs)?;
+                records.push(retention_record(
+                    "deleted",
+                    rel,
+                    &archived_at,
+                    Some(age_days),
+                    "expired",
+                ));
+            } else {
+                records.push(retention_record(
+                    "candidate",
+                    rel,
+                    &archived_at,
+                    Some(age_days),
+                    "expired",
+                ));
+            }
+        }
+    }
+
+    let candidate_count = count_action(&records, "candidate");
+    let deleted_count = count_action(&records, "deleted");
+    let kept_count = count_action(&records, "kept");
+    let skipped_count = count_action(&records, "skipped");
+    let mode = if apply { "apply" } else { "report" }.to_string();
+    let generated_at = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let today = now.format("%Y-%m-%d").to_string();
+    let report_abs = report_dir.join(format!("retention-{today}.json"));
+    let report = RetentionReport {
+        ok: true,
+        generated_at,
+        mode: mode.clone(),
+        retention_days: days,
+        candidate_count,
+        deleted_count,
+        kept_count,
+        skipped_count,
+        records,
+    };
+    fs::write(&report_abs, serde_json::to_string_pretty(&report)?)?;
+    let report_rel =
+        rel_path(&report_abs, vault).unwrap_or_else(|| report_abs.to_string_lossy().to_string());
+
+    Ok(RetentionSummary {
+        report: report_rel,
+        mode,
+        candidate_count,
+        deleted_count,
+        kept_count,
+        skipped_count,
+    })
+}
+
+fn retention_record(
+    action: &str,
+    path: String,
+    archived_at: &str,
+    age_days: Option<i64>,
+    reason: &str,
+) -> RetentionRecord {
+    RetentionRecord {
+        action: action.to_string(),
+        path,
+        archived_at: archived_at.to_string(),
+        age_days,
+        reason: reason.to_string(),
+    }
+}
+
+fn count_action(records: &[RetentionRecord], action: &str) -> usize {
+    records
+        .iter()
+        .filter(|record| record.action == action)
+        .count()
+}
+
+fn collect_markdown_files(dir: &Path, files: &mut Vec<std::path::PathBuf>) -> Result<()> {
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        let file_type = entry.file_type()?;
+        if file_type.is_dir() {
+            collect_markdown_files(&path, files)?;
+        } else if file_type.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("md")
+        {
+            files.push(path);
+        }
+    }
+    Ok(())
 }
 
 struct ParsedMarkdown {

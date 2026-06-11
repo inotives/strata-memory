@@ -19,6 +19,7 @@ pub(crate) enum Command {
     Init,
     ConfigCompile,
     Normalize(NormalizeArgs),
+    Retention(RetentionArgs),
 }
 
 #[derive(Debug)]
@@ -39,6 +40,11 @@ pub(crate) struct SearchArgs {
 pub(crate) struct NormalizeArgs {
     pub(crate) target: PathBuf,
     pub(crate) check: bool,
+}
+
+#[derive(Debug)]
+pub(crate) struct RetentionArgs {
+    pub(crate) apply: bool,
 }
 
 pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
@@ -211,6 +217,21 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
                 check,
             })
         }
+        "retention" => {
+            let mut apply = false;
+            while let Some(arg) = iter.next() {
+                match arg.as_str() {
+                    "--vault" => {
+                        let value = iter.next().ok_or("--vault requires PATH")?;
+                        vault = PathBuf::from(value);
+                    }
+                    "--apply" => apply = true,
+                    "--json" => json = true,
+                    other => return Err(format!("unknown argument: {other}").into()),
+                }
+            }
+            Command::Retention(RetentionArgs { apply })
+        }
         _ => return Err(format!("unknown command: {command}").into()),
     };
 
@@ -230,6 +251,7 @@ fn print_usage() {
     println!("       strata init [--vault PATH] [--json]");
     println!("       strata config-compile [--vault PATH] [--json]");
     println!("       strata normalize --target FILE [--vault PATH] [--check] [--json]");
+    println!("       strata retention [--vault PATH] [--apply] [--json]");
 }
 
 fn home_dir() -> PathBuf {

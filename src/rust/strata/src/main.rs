@@ -166,6 +166,30 @@ fn run() -> Result<()> {
                 Err(err) => return Err(err),
             }
         }
+        Command::Retention(args) => {
+            let summary = lifecycle::retention(&cli.vault, args.apply)?;
+            if cli.json {
+                println!(
+                    "{{\"ok\":true,\"report\":\"{}\",\"mode\":\"{}\",\"candidate_count\":{},\"deleted_count\":{},\"kept_count\":{},\"skipped_count\":{}}}",
+                    json_escape(&summary.report),
+                    json_escape(&summary.mode),
+                    summary.candidate_count,
+                    summary.deleted_count,
+                    summary.kept_count,
+                    summary.skipped_count
+                );
+            } else {
+                println!(
+                    "Retention {} complete: {} candidate, {} deleted, {} kept, {} skipped",
+                    summary.mode,
+                    summary.candidate_count,
+                    summary.deleted_count,
+                    summary.kept_count,
+                    summary.skipped_count
+                );
+                println!("Report: {}", summary.report);
+            }
+        }
     }
 
     Ok(())
