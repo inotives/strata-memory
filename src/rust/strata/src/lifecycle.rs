@@ -248,9 +248,6 @@ pub(crate) fn promote(
     to: &str,
     new_slug: Option<&str>,
 ) -> Result<PromoteSummary> {
-    if !matches!(to, "2_knowledge" | "3_intelligence") {
-        return Err("--to must be 2_knowledge or 3_intelligence".into());
-    }
     if !source.is_file() {
         return Err(format!("source not found: {}", source.to_string_lossy()).into());
     }
@@ -301,7 +298,12 @@ pub(crate) fn promote(
         };
     }
 
-    let target_rel = format!("{to}/{draft_dir}/{draft_base}");
+    let target_room = promote_target_room(to, &draft_dir)?;
+    let target_strata = target_room
+        .split('/')
+        .next()
+        .ok_or("invalid promotion target")?;
+    let target_rel = format!("{target_room}/{draft_base}");
     let archive_rel = format!("1_draft/_archived/{draft_subpath}");
     let target_abs = vault.join(&target_rel);
     let archive_abs = vault.join(&archive_rel);
@@ -317,7 +319,7 @@ pub(crate) fn promote(
         &parsed,
         &source_abs,
         &description,
-        to,
+        target_strata,
         "verified",
         &target_rel,
         &archive_rel,
@@ -338,7 +340,7 @@ pub(crate) fn promote(
 
     validate_candidate(
         &promoted,
-        "2_knowledge",
+        target_strata,
         "promoted candidate failed normalization",
     )?;
     validate_candidate(
@@ -372,6 +374,27 @@ pub(crate) fn promote(
         archive: log["archive"].as_str().unwrap_or_default().to_string(),
         log: log_rel,
     })
+}
+
+fn promote_target_room(to: &str, draft_dir: &str) -> Result<String> {
+    let to = to.trim_matches('/');
+    if to.is_empty()
+        || to.starts_with('/')
+        || to.contains('\\')
+        || to
+            .split('/')
+            .any(|part| part.is_empty() || part == "." || part == ".." || part.starts_with('.'))
+    {
+        return Err("--to must be a safe path under 2_knowledge or 3_intelligence".into());
+    }
+
+    if to == "2_knowledge" || to == "3_intelligence" {
+        Ok(format!("{to}/{draft_dir}"))
+    } else if to.starts_with("2_knowledge/") || to.starts_with("3_intelligence/") {
+        Ok(to.to_string())
+    } else {
+        Err("--to must be 2_knowledge, 3_intelligence, or a room under them".into())
+    }
 }
 
 fn validate_new_slug(slug: &str) -> Result<()> {

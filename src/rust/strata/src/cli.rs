@@ -307,7 +307,7 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
                         source = Some(PathBuf::from(value));
                     }
                     "--to" => {
-                        to = Some(iter.next().ok_or("--to requires TIER")?);
+                        to = Some(iter.next().ok_or("--to requires TARGET")?);
                     }
                     "--new-slug" => {
                         new_slug = Some(iter.next().ok_or("--new-slug requires SLUG")?);
@@ -349,7 +349,7 @@ fn print_usage() {
     println!("       strata init [--vault PATH] [--json]");
     println!("       strata config-compile [--vault PATH] [--json]");
     println!("       strata normalize --target FILE [--vault PATH] [--check] [--json]");
-    println!("       strata promote --source FILE --to 2_knowledge|3_intelligence [--new-slug SLUG] [--vault PATH] [--json]");
+    println!("       strata promote --source FILE --to 2_knowledge[/ROOM]|3_intelligence[/ROOM] [--new-slug SLUG] [--vault PATH] [--json]");
     println!("       strata retention [--vault PATH] [--apply] [--json]");
 }
 
