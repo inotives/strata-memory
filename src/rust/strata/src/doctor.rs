@@ -165,7 +165,7 @@ fn record_config(vault: &Path, checks: &mut Vec<Check>) {
     } else {
         checks.push(warn(
             "config_cache",
-            "0_core/cache/config.compiled.json is missing; run config-compile.sh when jq and yq are available",
+            "0_core/cache/config.compiled.json is missing; run strata config-compile",
         ));
     }
 }
@@ -175,7 +175,7 @@ fn record_database(vault: &Path, checks: &mut Vec<Check>) {
     if !db_path.is_file() {
         checks.push(error(
             "database",
-            "0_core/db/strata.db is missing; run db-migrate.sh",
+            "0_core/db/strata.db is missing; run strata db-migrate",
         ));
         return;
     }
@@ -236,7 +236,7 @@ fn record_review_counts(vault: &Path, checks: &mut Vec<Check>) {
             "tag_review",
             &format!("{count} unknown or similar tags found"),
         )),
-        Err(_) => checks.push(error("tag_review", "tag-review.sh failed")),
+        Err(_) => checks.push(error("tag_review", "strata tag-review failed")),
     }
 
     match review::unregistered_room_count(vault) {
@@ -245,7 +245,7 @@ fn record_review_counts(vault: &Path, checks: &mut Vec<Check>) {
             "room_review",
             &format!("{count} unregistered rooms found"),
         )),
-        Err(_) => checks.push(error("room_review", "room-review.sh failed")),
+        Err(_) => checks.push(error("room_review", "strata room-review failed")),
     }
 
     match review::link_review_counts(vault) {
@@ -258,7 +258,7 @@ fn record_review_counts(vault: &Path, checks: &mut Vec<Check>) {
             "link_review",
             &format!("{error_count} durable link errors found"),
         )),
-        Err(_) => checks.push(error("link_review", "link-review.sh failed")),
+        Err(_) => checks.push(error("link_review", "strata link-review failed")),
     }
 }
 
@@ -267,7 +267,7 @@ fn record_agents(vault: &Path, checks: &mut Vec<Check>) {
     let Ok(content) = fs::read_to_string(&agents) else {
         checks.push(error(
             "agents",
-            "AGENTS.md is missing; run agents-generate.sh",
+            "AGENTS.md is missing; run strata agents-generate",
         ));
         return;
     };

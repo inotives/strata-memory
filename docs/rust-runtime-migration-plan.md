@@ -1,6 +1,6 @@
 # Rust Runtime Migration Execution Plan
 
-**Status:** Draft execution plan  
+**Status:** Implemented  
 **Updated:** 2026-06-11
 
 This plan captures the agreed path from the Phase 4a Rust CLI baseline to a Rust-owned Strata-Memory runtime. It is a prerequisite track before implementing Phase 4 watchers and real-time sync from `docs/implementation_plan.md`.
@@ -8,21 +8,18 @@ This plan captures the agreed path from the Phase 4a Rust CLI baseline to a Rust
 ## Current Baseline
 
 - Rust CLI lives at `src/rust/strata`.
-- Current public Rust commands are:
-  - `strata index`
-  - `strata search`
-  - `strata link-review`
-- `index` already calls an internal Rust database migration helper before indexing.
-- `db-migrate` exists only as shell command behavior today; the Rust migration helper is not exposed as `strata db-migrate`.
-- Most fixture tests still target installed shell scripts under `0_core/script/`.
-- Rust-specific tests currently cover only index, search, and link-review.
-- `src/rust/strata/src/main.rs` is already large enough that more command logic should not be added without splitting modules first.
+- The Rust CLI owns the runtime command surface listed in the watcher readiness gate below.
+- `index` calls the internal Rust database migration helper before indexing.
+- `db-migrate` is exposed as `strata db-migrate`.
+- Runtime fixture tests target the Rust binary under `0_core/bin/strata`; `0_core/script` remains only for the one-off migration helper.
+- Rust-specific tests cover the migrated runtime commands.
+- Runtime logic is split across Rust modules instead of living in a single monolithic `main.rs`.
 
 ## Grill-Me Decisions
 
 - Rust becomes the single product runtime.
-- Shell scripts are temporary compatibility only during migration.
-- After Rust owns the full runtime command set, deprecated shell scripts should be deleted rather than archived.
+- Shell scripts were temporary compatibility only during migration.
+- After Rust owned the full runtime command set, deprecated shell scripts were deleted rather than archived.
 - Existing command names should be preserved as `strata <command>` names.
 - Machine contracts require strict parity:
   - JSON output for `--json`
@@ -107,7 +104,7 @@ Implementation steps:
 5. Keep `strata index`, `strata search`, and `strata link-review` stable.
 6. Add focused dependencies for YAML/JSON parsing and CLI handling.
 7. Remove runtime dependence on `jq`, `yq`, and external `sqlite3` for the migrated Rust commands where feasible.
-8. Update shell wrappers for migrated commands to delegate to `0_core/bin/strata` during transition.
+8. Delete migrated shell runtime commands after Rust parity is complete.
 
 Validation steps:
 
@@ -116,8 +113,8 @@ Validation steps:
 3. Add `test/rust_config_compile_test.sh`.
 4. Add `test/rust_agents_generate_test.sh`.
 5. Reuse the same fixture assertions as the shell tests.
-6. Confirm shell wrapper tests still pass through the Rust implementation.
-7. Run the full shell fixture suite.
+6. Confirm installed runtime tests call `0_core/bin/strata`.
+7. Run the full fixture suite.
 8. Run cargo formatting, check, and release build.
 
 Exit criteria:

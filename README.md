@@ -32,7 +32,7 @@
 
 Strata-Memory is a local-first memory system for agentic work. Markdown files are canonical. SQLite is a rebuildable derived index for search, metadata queries, link review, and retrieval workflows.
 
-This repository is the public engine repo. It contains the Rust CLI, installer, shell wrappers, templates, tests, and documentation for installing Strata into a private vault.
+This repository is the public engine repo. It contains the Rust CLI, installer, migration helper, templates, tests, and documentation for installing Strata into a private vault.
 
 By default, the private vault lives at:
 
@@ -79,7 +79,7 @@ Strata-Memory does not auto-install dependencies. On Debian/Ubuntu-like systems:
 sudo apt install cargo rustc sqlite3 bash gawk sed findutils coreutils jq yq
 ```
 
-SQLite should support FTS5 for full search indexing. The database scripts detect FTS5 support and record migration `002` only when available.
+SQLite should support FTS5 for full search indexing. The Rust CLI detects FTS5 support and records migration `002` only when available.
 
 ## Install
 
@@ -106,7 +106,7 @@ Machine-readable install output:
 The installer:
 
 - initializes the vault structure
-- copies managed engine files into `0_core/script`, `0_core/db`, `0_core/doc`, and `0_core/template`
+- copies managed engine files into `0_core/bin`, `0_core/db`, `0_core/doc`, `0_core/template`, and the one-off migration helper under `0_core/script`
 - copies the built Rust CLI into `0_core/bin/strata` when `src/rust/strata/target/release/strata` exists
 - preserves existing `0_core/config/configs.yaml`
 - creates `.gitignore` and `AGENTS.md` only when missing
@@ -115,8 +115,8 @@ The installer:
 After install, run:
 
 ```bash
-~/.strata-memory/0_core/script/db-migrate.sh --vault ~/.strata-memory
-~/.strata-memory/0_core/script/doctor.sh --vault ~/.strata-memory
+~/.strata-memory/0_core/bin/strata db-migrate --vault ~/.strata-memory
+~/.strata-memory/0_core/bin/strata doctor --vault ~/.strata-memory
 ```
 
 ## Rust CLI
@@ -127,38 +127,50 @@ The primary engine is the installed Rust binary:
 ~/.strata-memory/0_core/bin/strata
 ```
 
-Current Rust-backed commands:
+Runtime commands:
 
 ```text
+strata init --vault PATH [--json]
+strata db-migrate --vault PATH [--json]
+strata config-compile --vault PATH [--json]
+strata agents-generate --vault PATH [--json]
 strata index [--target FILE | --full] --vault PATH [--json]
 strata search --query TEXT --vault PATH [--limit N] [--include-archived] [--paths-only] [--json]
 strata link-review --vault PATH [--json]
+strata normalize --target FILE --vault PATH [--check] [--json]
+strata promote --source FILE --to 2_knowledge|3_intelligence [--new-slug SLUG] --vault PATH [--json]
+strata retention --vault PATH [--apply] [--json]
+strata doctor --vault PATH [--json]
+strata tag-review --vault PATH [--json]
+strata room-review --vault PATH [--json]
+strata privacy-review --vault PATH [--json]
 ```
 
-The installed shell scripts remain stable wrappers for existing user workflows. `index.sh`, `search.sh`, and `link-review.sh` delegate to `0_core/bin/strata` when present. Set `STRATA_INDEX_BASH_FALLBACK=1`, `STRATA_SEARCH_BASH_FALLBACK=1`, or `STRATA_LINK_REVIEW_BASH_FALLBACK=1` to force the Bash fallback for that command.
+`0_core/script/migration.sh` remains as one-off legacy migration tooling. It is not part of the normal runtime command surface.
 
 Rust full indexing reports progress on stderr when run interactively. For non-interactive runs, set `STRATA_INDEX_PROGRESS_EVERY=N` to print progress every N scanned files, or `0` to disable progress.
 
 ## Common Commands
 
-Use the installed Rust CLI for Rust-backed commands. Shell wrappers remain for commands that have not moved to Rust yet.
+Use the installed Rust CLI for runtime commands.
 
 | Command | Purpose |
 |---|---|
+| `strata init --vault PATH [--json]` | Create the vault directory layout. |
+| `strata db-migrate --vault PATH [--json]` | Create or update the derived SQLite schema. |
+| `strata config-compile --vault PATH [--json]` | Validate config and write `0_core/cache/config.compiled.json`. |
+| `strata agents-generate --vault PATH [--json]` | Generate vault `AGENTS.md` while preserving manual sections. |
 | `strata index [--target FILE \| --full] --vault PATH [--json]` | Index Markdown files into SQLite. |
 | `strata search --query TEXT --vault PATH [--limit N] [--include-archived] [--paths-only] [--json]` | Search indexed memory with SQLite FTS5. |
 | `strata link-review --vault PATH [--json]` | Review local Markdown links. Broken durable links are blocking errors. |
-| `0_core/script/init.sh --vault PATH` | Create the vault directory layout. Shell wrapper. |
-| `0_core/script/db-migrate.sh --vault PATH [--json]` | Create or update the derived SQLite schema. Shell wrapper. |
-| `0_core/script/normalize.sh --target FILE [--vault PATH] [--check] [--json]` | Normalize constrained Markdown frontmatter. Shell wrapper. |
-| `0_core/script/promote.sh --source FILE --to ROOM [--slug NAME] [--vault PATH] [--json]` | Promote a draft into a durable tier and archive the original. Shell wrapper. |
-| `0_core/script/doctor.sh --vault PATH [--json]` | Check vault health without mutating files. Shell wrapper. |
-| `0_core/script/tag-review.sh --vault PATH [--json]` | Review frontmatter tags against allowed tags. Shell wrapper. |
-| `0_core/script/room-review.sh --vault PATH [--json]` | Report files outside registered room patterns. Shell wrapper. |
-| `0_core/script/privacy-review.sh --vault PATH [--json]` | Report local-path and privacy warnings. Shell wrapper. |
-| `0_core/script/config-compile.sh --vault PATH [--json]` | Validate config and write `0_core/cache/config.compiled.json`. Requires `jq` and `yq`. Shell wrapper. |
-| `0_core/script/agents-generate.sh --vault PATH [--json]` | Generate vault `AGENTS.md` while preserving manual sections. Shell wrapper. |
-| `0_core/script/retention.sh --vault PATH [--apply] [--json]` | Report or delete archived drafts past retention policy. Shell wrapper. |
+| `strata normalize --target FILE --vault PATH [--check] [--json]` | Normalize constrained Markdown frontmatter. |
+| `strata promote --source FILE --to 2_knowledge\|3_intelligence [--new-slug SLUG] --vault PATH [--json]` | Promote a draft into a durable tier and archive the original. |
+| `strata retention --vault PATH [--apply] [--json]` | Report or delete archived drafts past retention policy. |
+| `strata doctor --vault PATH [--json]` | Check vault health without mutating files. |
+| `strata tag-review --vault PATH [--json]` | Review frontmatter tags against allowed tags. |
+| `strata room-review --vault PATH [--json]` | Report files outside registered room patterns. |
+| `strata privacy-review --vault PATH [--json]` | Report local-path and privacy warnings. |
+| `0_core/script/migration.sh --from PATH --to PATH --section NAME\|--all [--json]` | One-off legacy Agent Memory migration helper. |
 
 ## Draft Templates
 
@@ -178,24 +190,24 @@ If indexing reports SQLite lock, journal, or disk I/O errors after a crash or re
 
 ```bash
 findmnt -T ~/.strata-memory -no TARGET,OPTIONS
-~/.strata-memory/0_core/script/doctor.sh --vault ~/.strata-memory --json
+~/.strata-memory/0_core/bin/strata doctor --vault ~/.strata-memory --json
 ```
 
-The `findmnt` output should not show `ro`. `doctor.sh` reports whether `0_core/tmp` and `0_core/db` are writable.
+The `findmnt` output should not show `ro`. `strata doctor` reports whether `0_core/tmp` and `0_core/db` are writable.
 
 After the filesystem is healthy, rebuild only the derived index:
 
 ```bash
 rm -f ~/.strata-memory/0_core/db/strata.db ~/.strata-memory/0_core/db/strata.db-journal
-~/.strata-memory/0_core/script/db-migrate.sh --vault ~/.strata-memory
-~/.strata-memory/0_core/script/index.sh --vault ~/.strata-memory --full --json
+~/.strata-memory/0_core/bin/strata db-migrate --vault ~/.strata-memory
+~/.strata-memory/0_core/bin/strata index --vault ~/.strata-memory --full --json
 ```
 
 Validate the rebuilt database:
 
 ```bash
 sqlite3 ~/.strata-memory/0_core/db/strata.db 'PRAGMA quick_check;'
-~/.strata-memory/0_core/script/doctor.sh --vault ~/.strata-memory --json
+~/.strata-memory/0_core/bin/strata doctor --vault ~/.strata-memory --json
 ```
 
 ## Reviews And Validation
@@ -203,11 +215,11 @@ sqlite3 ~/.strata-memory/0_core/db/strata.db 'PRAGMA quick_check;'
 Run these after bulk edits:
 
 ```bash
-~/.strata-memory/0_core/script/doctor.sh --vault ~/.strata-memory --json
-~/.strata-memory/0_core/script/tag-review.sh --vault ~/.strata-memory --json
-~/.strata-memory/0_core/script/room-review.sh --vault ~/.strata-memory --json
-~/.strata-memory/0_core/script/link-review.sh --vault ~/.strata-memory --json
-~/.strata-memory/0_core/script/privacy-review.sh --vault ~/.strata-memory --json
+~/.strata-memory/0_core/bin/strata doctor --vault ~/.strata-memory --json
+~/.strata-memory/0_core/bin/strata tag-review --vault ~/.strata-memory --json
+~/.strata-memory/0_core/bin/strata room-review --vault ~/.strata-memory --json
+~/.strata-memory/0_core/bin/strata link-review --vault ~/.strata-memory --json
+~/.strata-memory/0_core/bin/strata privacy-review --vault ~/.strata-memory --json
 ```
 
 Review semantics:
@@ -215,18 +227,19 @@ Review semantics:
 - tag and room issues are warnings in `doctor`
 - broken durable local links are blocking errors
 - privacy review reports warnings without blocking
-- missing full-mode dependencies (`jq`, `yq`) are warnings unless running full-mode config compilation
+- missing full-mode dependencies (`jq`, `yq`) are warnings in `doctor`
 
 ## Development
 
 Run focused checks:
 
 ```bash
-rtk bash -n install.sh src/script/*.sh src/script/lib/*.sh test/*.sh
-rtk bash test/doctor_test.sh
+rtk bash -n install.sh src/script/migration.sh src/script/lib/*.sh test/*.sh
+rtk cargo check --manifest-path src/rust/strata/Cargo.toml
+rtk bash test/rust_doctor_test.sh
 ```
 
-Run the full shell test suite:
+Run the full test suite:
 
 ```bash
 for f in test/*_test.sh; do

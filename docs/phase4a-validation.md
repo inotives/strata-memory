@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-08
 
-Phase 4a introduces an optional Rust CLI at `0_core/bin/strata` behind the existing Bash command contract. Bash scripts remain the public entry points and fallback implementations.
+Phase 4a introduced an optional Rust CLI at `0_core/bin/strata` behind the then-existing Bash command contract. That wrapper/fallback state has since been superseded by the Rust runtime migration.
 
 ## Implemented Commands
 
@@ -10,17 +10,11 @@ Phase 4a introduces an optional Rust CLI at `0_core/bin/strata` behind the exist
 - `strata search`
 - `strata link-review`
 
-Installed wrappers delegate to Rust when `0_core/bin/strata` exists:
+Installed commands now run directly through `0_core/bin/strata`:
 
-- `0_core/script/index.sh`
-- `0_core/script/search.sh`
-- `0_core/script/link-review.sh`
-
-Fallback controls:
-
-- `STRATA_INDEX_BASH_FALLBACK=1`
-- `STRATA_SEARCH_BASH_FALLBACK=1`
-- `STRATA_LINK_REVIEW_BASH_FALLBACK=1`
+- `0_core/bin/strata index`
+- `0_core/bin/strata search`
+- `0_core/bin/strata link-review`
 
 Rust full-index progress is written to stderr. Non-interactive progress can be controlled with `STRATA_INDEX_PROGRESS_EVERY=N`; use `0` to disable it.
 

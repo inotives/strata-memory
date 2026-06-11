@@ -547,8 +547,8 @@ while IFS="$(printf '\t')" read -r old_abs old_rel new_rel; do
     record written "$old_rel" "$new_rel" "migrated"
 done < "$plan_tmp"
 
-if [ "$written_count" -gt 0 ] && [ -x "$to/0_core/script/index.sh" ]; then
-    "$to/0_core/script/index.sh" --vault "$to" --full >/dev/null 2>&1 || record warning "" "" "full indexing failed"
+if [ "$written_count" -gt 0 ] && [ -x "$to/0_core/bin/strata" ]; then
+    "$to/0_core/bin/strata" index --vault "$to" --full >/dev/null 2>&1 || record warning "" "" "full indexing failed"
 fi
 
 generated_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')

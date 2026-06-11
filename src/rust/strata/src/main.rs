@@ -251,7 +251,7 @@ fn index(vault: &Path, mode: IndexMode) -> Result<usize> {
 fn search(vault: &Path, args: &SearchArgs, json: bool) -> Result<()> {
     let db_path = vault.join("0_core/db/strata.db");
     if !db_path.is_file() {
-        return Err("database not found; run index.sh first".into());
+        return Err("database not found; run strata index first".into());
     }
 
     let conn = Connection::open(db_path)?;
