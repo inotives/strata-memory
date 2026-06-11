@@ -90,6 +90,12 @@ pub(crate) fn retention_archived_drafts_days(vault: &Path) -> Result<i64> {
     Ok(config.retention.archived_drafts_days)
 }
 
+pub(crate) fn allowed_tags(vault: &Path) -> Result<Vec<String>> {
+    let mut tags = read_config(vault)?.tags.allowed;
+    tags.sort();
+    Ok(tags)
+}
+
 fn read_config(vault: &Path) -> Result<Config> {
     let config_path = vault.join("0_core/config/configs.yaml");
     if !config_path.is_file() {

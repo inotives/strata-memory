@@ -97,6 +97,9 @@ fn run() -> Result<()> {
         Command::PrivacyReview => {
             review::privacy_review(&cli.vault, cli.json)?;
         }
+        Command::TagReview => {
+            review::tag_review(&cli.vault, cli.json)?;
+        }
         Command::DbMigrate => {
             let applied = db::migrate(&cli.vault)?;
             let db_path = cli.vault.join("0_core/db/strata.db");

@@ -1,4 +1,4 @@
-use crate::{absolute_path, collect_markdown_files_rec, json_escape, rel_path, Result};
+use crate::{absolute_path, collect_markdown_files_rec, config, json_escape, rel_path, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -116,6 +116,61 @@ pub(crate) fn privacy_review(vault: &Path, json: bool) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn tag_review(vault: &Path, json: bool) -> Result<()> {
+    let allowed = config::allowed_tags(vault)?;
+    let files = collect_review_markdown_files(vault)?;
+    let mut unknown = Vec::new();
+
+    for file in files {
+        let abs = absolute_path(&file)?;
+        let Some(rel) = rel_path(&abs, vault) else {
+            continue;
+        };
+        let content = fs::read_to_string(&abs)?;
+        for tag in extract_frontmatter_tags(&content) {
+            if let Some(similar) = unknown_tag_similar(&tag, &allowed) {
+                unknown.push(UnknownTag {
+                    path: rel.clone(),
+                    tag,
+                    similar,
+                });
+            }
+        }
+    }
+
+    if json {
+        print!(
+            "{{\"ok\":true,\"unknown_count\":{},\"unknown\":[",
+            unknown.len()
+        );
+        for (idx, item) in unknown.iter().enumerate() {
+            if idx > 0 {
+                print!(",");
+            }
+            print!(
+                "{{\"path\":\"{}\",\"tag\":\"{}\",\"similar\":\"{}\"}}",
+                json_escape(&item.path),
+                json_escape(&item.tag),
+                json_escape(&item.similar)
+            );
+        }
+        println!("]}}");
+    } else if unknown.is_empty() {
+        println!("No unknown tags found");
+    } else {
+        println!("Unknown tags:");
+        for item in &unknown {
+            if item.similar.is_empty() {
+                println!("{}: {}", item.path, item.tag);
+            } else {
+                println!("{}: {} (similar: {})", item.path, item.tag, item.similar);
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn collect_review_markdown_files(vault: &Path) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     for rel in ["1_draft", "2_knowledge", "3_intelligence"] {
@@ -201,6 +256,84 @@ struct PrivacyWarning {
     path: String,
     line: i64,
     detail: String,
+}
+
+#[derive(Debug)]
+struct UnknownTag {
+    path: String,
+    tag: String,
+    similar: String,
+}
+
+fn extract_frontmatter_tags(content: &str) -> Vec<String> {
+    let mut tags = Vec::new();
+    let mut lines = content.lines();
+    if lines.next() != Some("---") {
+        return tags;
+    }
+
+    let mut in_tags = false;
+    for line in lines {
+        if line == "---" {
+            break;
+        }
+        if line.starts_with("tags:") {
+            in_tags = true;
+            continue;
+        }
+        if in_tags && line.starts_with("  -") {
+            let value = line
+                .trim_start()
+                .trim_start_matches('-')
+                .trim_start()
+                .trim_matches('"')
+                .to_string();
+            tags.push(value);
+            continue;
+        }
+        if in_tags && !line.starts_with(' ') {
+            break;
+        }
+    }
+
+    tags
+}
+
+fn unknown_tag_similar(tag: &str, allowed: &[String]) -> Option<String> {
+    let tag_lc = tag.to_ascii_lowercase();
+    let tag_norm = normalize_tag(tag);
+    let mut similar = String::new();
+
+    for allowed_tag in allowed {
+        let allowed_lc = allowed_tag.to_ascii_lowercase();
+        let allowed_norm = normalize_tag(allowed_tag);
+        if tag == allowed_tag {
+            return None;
+        }
+        if tag_lc == allowed_lc || tag_norm == allowed_norm {
+            similar = allowed_tag.clone();
+        }
+    }
+
+    Some(similar)
+}
+
+fn normalize_tag(tag: &str) -> String {
+    let mut normalized = tag
+        .chars()
+        .map(|ch| match ch {
+            'A'..='Z' => ch.to_ascii_lowercase(),
+            '_' | ' ' => '-',
+            _ => ch,
+        })
+        .collect::<String>();
+    while normalized.ends_with('-') {
+        normalized.pop();
+    }
+    if normalized.ends_with('s') {
+        normalized.pop();
+    }
+    normalized
 }
 
 fn privacy_warnings_for_file(path: &str, content: &str) -> Vec<PrivacyWarning> {
