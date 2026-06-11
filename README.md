@@ -12,7 +12,7 @@
   <a href="License.md"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-white?style=for-the-badge&labelColor=000000"></a>
   <a href="docs/project_spec.md"><img alt="Status: implementation" src="https://img.shields.io/badge/status-implementation-white?style=for-the-badge&labelColor=000000"></a>
   <img alt="Runtime: Rust CLI" src="https://img.shields.io/badge/runtime-rust%20cli-white?style=for-the-badge&labelColor=000000">
-  <img alt="Shell: wrappers" src="https://img.shields.io/badge/shell-wrappers-white?style=for-the-badge&labelColor=000000">
+  <img alt="Shell: migration helper" src="https://img.shields.io/badge/shell-migration%20helper-white?style=for-the-badge&labelColor=000000">
   <img alt="Index: SQLite FTS5" src="https://img.shields.io/badge/index-sqlite%20fts5-white?style=for-the-badge&labelColor=000000">
 </p>
 
