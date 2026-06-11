@@ -70,6 +70,52 @@ pub(crate) fn link_review(vault: &Path, json: bool) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn privacy_review(vault: &Path, json: bool) -> Result<()> {
+    let files = collect_privacy_review_files(vault)?;
+    let mut warnings = Vec::new();
+
+    for file in files {
+        let abs = absolute_path(&file)?;
+        let Some(rel) = rel_path(&abs, vault) else {
+            continue;
+        };
+        let content = fs::read_to_string(&abs)?;
+        warnings.extend(privacy_warnings_for_file(&rel, &content));
+    }
+
+    if json {
+        print!(
+            "{{\"ok\":true,\"warning_count\":{},\"warnings\":[",
+            warnings.len()
+        );
+        for (idx, warning) in warnings.iter().enumerate() {
+            if idx > 0 {
+                print!(",");
+            }
+            print!(
+                "{{\"severity\":\"warn\",\"reason\":\"{}\",\"path\":\"{}\",\"line\":{},\"detail\":\"{}\"}}",
+                json_escape(&warning.reason),
+                json_escape(&warning.path),
+                warning.line,
+                json_escape(&warning.detail)
+            );
+        }
+        println!("]}}");
+    } else if warnings.is_empty() {
+        println!("No private-data warnings found");
+    } else {
+        println!("Private-data warnings:");
+        for warning in &warnings {
+            println!(
+                "warn {} {}:{} {}",
+                warning.reason, warning.path, warning.line, warning.detail
+            );
+        }
+    }
+
+    Ok(())
+}
+
 fn collect_review_markdown_files(vault: &Path) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     for rel in ["1_draft", "2_knowledge", "3_intelligence"] {
@@ -80,6 +126,51 @@ fn collect_review_markdown_files(vault: &Path) -> Result<Vec<PathBuf>> {
     }
     files.sort();
     Ok(files)
+}
+
+fn collect_privacy_review_files(vault: &Path) -> Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    for rel in ["1_draft", "2_knowledge", "3_intelligence"] {
+        let root = vault.join(rel);
+        if root.is_dir() {
+            collect_privacy_review_files_rec(&root, &mut files)?;
+        }
+    }
+
+    let agents = vault.join("AGENTS.md");
+    if agents.is_file() {
+        files.push(agents);
+    }
+
+    files.sort();
+    Ok(files)
+}
+
+fn collect_privacy_review_files_rec(root: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
+    for entry in fs::read_dir(root)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            collect_privacy_review_files_rec(&path, files)?;
+        } else if is_privacy_review_file(&path) {
+            files.push(path);
+        }
+    }
+    Ok(())
+}
+
+fn is_privacy_review_file(path: &Path) -> bool {
+    let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+        return false;
+    };
+    if name == ".env" {
+        return true;
+    }
+
+    matches!(
+        path.extension().and_then(|value| value.to_str()),
+        Some("md" | "txt" | "yaml" | "yml" | "json")
+    )
 }
 
 #[derive(Debug)]
@@ -102,6 +193,213 @@ struct LinkIssue {
     path: String,
     target: String,
     line: i64,
+}
+
+#[derive(Debug)]
+struct PrivacyWarning {
+    reason: String,
+    path: String,
+    line: i64,
+    detail: String,
+}
+
+fn privacy_warnings_for_file(path: &str, content: &str) -> Vec<PrivacyWarning> {
+    let mut warnings = Vec::new();
+    let mut log_lines = 0;
+    let mut line_count = 0;
+
+    for (line_idx, line) in content.lines().enumerate() {
+        line_count = line_idx + 1;
+        let line_no = line_count as i64;
+        if line.contains("file://") {
+            warnings.push(privacy_warning(
+                "file_url",
+                path,
+                line_no,
+                "file:// links expose local machine paths",
+            ));
+        }
+        if contains_absolute_home_path(line) {
+            warnings.push(privacy_warning(
+                "absolute_home_path",
+                path,
+                line_no,
+                "absolute home path found",
+            ));
+        }
+        if line.contains("-----BEGIN ") && line.contains("PRIVATE KEY-----") {
+            warnings.push(privacy_warning(
+                "private_ssh_key",
+                path,
+                line_no,
+                "private key block found",
+            ));
+        }
+        if is_env_secret_assignment(line) {
+            warnings.push(privacy_warning(
+                "env_secret",
+                path,
+                line_no,
+                "environment-style secret assignment found",
+            ));
+        }
+        if is_api_key_like_assignment(line) {
+            warnings.push(privacy_warning(
+                "api_key_like",
+                path,
+                line_no,
+                "API-key-like assignment found",
+            ));
+        }
+        if contains_sk_prefixed_token(line) {
+            warnings.push(privacy_warning(
+                "api_key_like",
+                path,
+                line_no,
+                "sk-prefixed token found",
+            ));
+        }
+        if contains_log_level(line) {
+            log_lines += 1;
+        }
+    }
+
+    if line_count > 1200 && log_lines > 100 {
+        warnings.push(privacy_warning(
+            "large_pasted_log",
+            path,
+            1,
+            "large log-like file found",
+        ));
+    }
+
+    warnings
+}
+
+fn privacy_warning(reason: &str, path: &str, line: i64, detail: &str) -> PrivacyWarning {
+    PrivacyWarning {
+        reason: reason.to_string(),
+        path: path.to_string(),
+        line,
+        detail: detail.to_string(),
+    }
+}
+
+fn contains_absolute_home_path(line: &str) -> bool {
+    for prefix in ["/home/", "/Users/"] {
+        let mut search_start = 0;
+        while let Some(pos) = line[search_start..].find(prefix) {
+            let abs_pos = search_start + pos;
+            let before = line[..abs_pos].chars().next_back();
+            if before.is_none_or(|ch| !ch.is_ascii_alphanumeric() && ch != '_' && ch != '/') {
+                return true;
+            }
+            search_start = abs_pos + prefix.len();
+        }
+    }
+
+    let mut search_start = 0;
+    while let Some(pos) = line[search_start..].find("/root") {
+        let abs_pos = search_start + pos;
+        let before = line[..abs_pos].chars().next_back();
+        let after = line[abs_pos + "/root".len()..].chars().next();
+        if before.is_none_or(|ch| !ch.is_ascii_alphanumeric() && ch != '_' && ch != '/')
+            && after.is_none_or(|ch| ch == '/')
+        {
+            return true;
+        }
+        search_start = abs_pos + "/root".len();
+    }
+    false
+}
+
+fn is_env_secret_assignment(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    let assignment = trimmed.strip_prefix("export ").unwrap_or(trimmed);
+    let Some((name, _value)) = assignment.split_once('=') else {
+        return false;
+    };
+    let name = name.trim_end();
+    if name.is_empty() || !is_shell_identifier(name) {
+        return false;
+    }
+
+    [
+        "SECRET",
+        "TOKEN",
+        "PASSWORD",
+        "PASS",
+        "API_KEY",
+        "ACCESS_KEY",
+        "PRIVATE_KEY",
+    ]
+    .iter()
+    .any(|needle| name.contains(needle))
+}
+
+fn is_shell_identifier(value: &str) -> bool {
+    let mut chars = value.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if first != '_' && !first.is_ascii_alphabetic() {
+        return false;
+    }
+    chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+}
+
+fn is_api_key_like_assignment(line: &str) -> bool {
+    let lower = line.to_ascii_lowercase();
+    let Some(key_pos) = [
+        "api_key",
+        "api-key",
+        "access_token",
+        "access-token",
+        "secret",
+        "password",
+        "bearer",
+    ]
+    .iter()
+    .filter_map(|needle| lower.find(needle))
+    .min() else {
+        return false;
+    };
+    let rest = &line[key_pos..];
+    let Some(sep_pos) = rest.find([':', '=']) else {
+        return false;
+    };
+    let value = rest[sep_pos + 1..]
+        .trim_start()
+        .trim_start_matches(['"', '\'']);
+    token_like_len(value) >= 20
+}
+
+fn contains_sk_prefixed_token(line: &str) -> bool {
+    line.split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '-')
+        .any(|token| {
+            token.strip_prefix("sk-").is_some_and(|suffix| {
+                suffix.len() >= 20 && suffix.chars().all(|ch| ch.is_ascii_alphanumeric())
+            })
+        })
+}
+
+fn token_like_len(value: &str) -> usize {
+    value
+        .chars()
+        .take_while(|ch| {
+            ch.is_ascii_alphanumeric() || matches!(ch, '_' | '/' | '+' | '=' | '.' | '-')
+        })
+        .count()
+}
+
+fn contains_log_level(line: &str) -> bool {
+    line.split(|ch: char| !ch.is_ascii_alphanumeric())
+        .any(|token| {
+            matches!(
+                token,
+                "TRACE" | "DEBUG" | "INFO" | "WARN" | "WARNING" | "ERROR" | "FATAL"
+            )
+        })
 }
 
 fn extract_review_links(content: &str) -> Vec<ReviewLink> {
