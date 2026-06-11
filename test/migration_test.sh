@@ -8,6 +8,7 @@ WORK=$(mktemp -d "${TMP_ROOT}/migration-test-XXXXXXXX")
 trap 'rm -rf "$WORK"' EXIT HUP INT TERM
 OLD="${WORK}/old-memory"
 VAULT="${WORK}/vault"
+STRATA_BIN="${VAULT}/0_core/bin/strata"
 
 fail() {
     printf 'not ok - %s\n' "$1" >&2
@@ -31,6 +32,8 @@ assert_contains() {
 snapshot_old() {
     (cd "$OLD" && find . -type f -print | sort | while IFS= read -r file; do cksum "$file"; done)
 }
+
+cargo build --release --manifest-path "${ROOT}/src/rust/strata/Cargo.toml" >/dev/null
 
 mkdir -p \
     "$OLD/2_knowledges/Concepts" \
@@ -232,6 +235,6 @@ if "${COLLIDE_VAULT}/0_core/script/migration.sh" --from "$COLLIDE" --to "$COLLID
     fail "expected collision to block migration"
 fi
 
-"${VAULT}/0_core/script/search.sh" --vault "$VAULT" --query "Alpha" --limit 1 >/dev/null
+"$STRATA_BIN" search --vault "$VAULT" --query "Alpha" --limit 1 >/dev/null
 
 printf 'ok - migration passed\n'

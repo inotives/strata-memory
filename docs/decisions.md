@@ -67,7 +67,7 @@ docs/
 - Markdown files are canonical.
 - SQLite is a rebuildable derived index and cache.
 - Commands mutate Markdown/filesystem state first, then re-index affected paths.
-- If indexing fails after a file operation, recovery is to re-run `index.sh`.
+- If indexing fails after a file operation, recovery is to re-run `strata index`.
 
 ## Frontmatter and Metadata
 
@@ -114,7 +114,7 @@ promoted_at: "2026-06-06T15:32:04Z"
 
 - Tags use a controlled vocabulary in config.
 - Unknown tags warn in drafts and are reviewed at promotion.
-- `tag-review.sh` detects similar/new tags and can update the allowed tag list with human approval.
+- `strata tag-review` detects similar/new tags and can update the allowed tag list with human approval.
 - Durable artifact slugs are lowercase, hyphenated, and conservative.
 - Entity identifiers may preserve domain conventions in metadata, not in paths.
 
@@ -138,7 +138,7 @@ promoted_at: "2026-06-06T15:32:04Z"
 - Watchers are post-migration, not MVP.
 - Required bootstrap tools: bash, sqlite3, awk, sed, find, sort, mktemp.
 - Full mode requires `yq` and `jq`.
-- `init.sh` does not auto-install dependencies; it prints install guidance.
+- `strata init` does not auto-install dependencies; it prints install guidance.
 - Use vault-local temp files under `0_core/tmp/`.
 - Use `mktemp` with explicit templates under `0_core/tmp/`.
 
@@ -146,7 +146,7 @@ promoted_at: "2026-06-06T15:32:04Z"
 
 - Skill scripts require an execution allowlist.
 - Imported external skills and agents are staged through `1_draft` before promotion.
-- Add `privacy-review.sh` for warning-only private-data checks in MVP.
+- Add `strata privacy-review` for warning-only private-data checks in MVP.
 - Tests never touch real vaults; they use isolated fixture vaults under test temp directories.
 - The system supports git but does not require it.
 

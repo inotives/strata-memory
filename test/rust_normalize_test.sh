@@ -4,7 +4,7 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 TMP_ROOT="${ROOT}/test/tmp"
 mkdir -p "$TMP_ROOT"
-VAULT=$(mktemp -d "${TMP_ROOT}/normalize-test-XXXXXXXX")
+VAULT=$(mktemp -d "${TMP_ROOT}/rust-normalize-test-XXXXXXXX")
 trap 'rm -rf "$VAULT"' EXIT HUP INT TERM
 
 fail() {
@@ -19,10 +19,12 @@ assert_contains() {
 }
 
 "${ROOT}/install.sh" --vault "$VAULT" >/dev/null
+STRATA_BIN="${ROOT}/src/rust/strata/target/debug/strata"
+cargo build --manifest-path "${ROOT}/src/rust/strata/Cargo.toml" >/dev/null
 
 draft="${VAULT}/1_draft/note/no-frontmatter.md"
 printf '# No Frontmatter\n\nBody text.\n' > "$draft"
-"${VAULT}/0_core/script/normalize.sh" --vault "$VAULT" --target "$draft" >/dev/null
+"$STRATA_BIN" normalize --vault "$VAULT" --target "$draft" >/dev/null
 assert_contains "$draft" 'strata: "1_draft"'
 assert_contains "$draft" 'status: "pending"'
 assert_contains "$draft" 'description: ""'
@@ -37,10 +39,15 @@ tags:
 ---
 Draft body.
 EOF
-"${VAULT}/0_core/script/normalize.sh" --vault "$VAULT" --target "$partial" >/dev/null
+"$STRATA_BIN" normalize --vault "$VAULT" --target "$partial" >/dev/null
 assert_contains "$partial" 'title: "Partial Draft"'
 assert_contains "$partial" '  - research'
 assert_contains "$partial" 'Draft body.'
+
+before=$(cksum "$partial")
+"$STRATA_BIN" normalize --vault "$VAULT" --target "$partial" --check >/dev/null
+after=$(cksum "$partial")
+[ "$before" = "$after" ] || fail "expected --check not to modify target"
 
 durable="${VAULT}/2_knowledge/research/quoted-time.md"
 cat > "$durable" <<'EOF'
@@ -54,7 +61,7 @@ promoted_at: "2026-06-06T15:32:04Z"
 ---
 Durable body.
 EOF
-"${VAULT}/0_core/script/normalize.sh" --vault "$VAULT" --target "$durable" >/dev/null
+"$STRATA_BIN" normalize --vault "$VAULT" --target "$durable" >/dev/null
 assert_contains "$durable" 'promoted_at: "2026-06-06T15:32:04Z"'
 assert_contains "$durable" 'strata: "2_knowledge"'
 assert_contains "$durable" 'sources:'
@@ -66,8 +73,14 @@ title: "Missing Description"
 ---
 Body.
 EOF
-if "${VAULT}/0_core/script/normalize.sh" --vault "$VAULT" --target "$missing_description" >/dev/null 2>&1; then
+if "$STRATA_BIN" normalize --vault "$VAULT" --target "$missing_description" >/dev/null 2>&1; then
     fail "expected durable missing description to fail"
 fi
 
-printf 'ok - normalize passed\n'
+json=$("$STRATA_BIN" normalize --vault "$VAULT" --target "$draft" --json)
+case "$json" in
+    *'"ok":true'*'"path":"1_draft/note/no-frontmatter.md"'*) ;;
+    *) fail "expected normalize json success, got: $json" ;;
+esac
+
+printf 'ok - rust normalize passed\n'

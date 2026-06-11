@@ -4,7 +4,7 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 TMP_ROOT="${ROOT}/test/tmp"
 mkdir -p "$TMP_ROOT"
-VAULT=$(mktemp -d "${TMP_ROOT}/retention-test-XXXXXXXX")
+VAULT=$(mktemp -d "${TMP_ROOT}/rust-retention-test-XXXXXXXX")
 trap 'rm -rf "$VAULT"' EXIT HUP INT TERM
 
 fail() {
@@ -27,6 +27,8 @@ assert_contains() {
 }
 
 "${ROOT}/install.sh" --vault "$VAULT" >/dev/null
+STRATA_BIN="${ROOT}/src/rust/strata/target/debug/strata"
+cargo build --manifest-path "${ROOT}/src/rust/strata/Cargo.toml" >/dev/null
 
 mkdir -p "${VAULT}/1_draft/_archived/research"
 
@@ -53,7 +55,7 @@ title: "Missing"
 # Missing
 EOF
 
-out=$("${VAULT}/0_core/script/retention.sh" --vault "$VAULT" --json)
+out=$("$STRATA_BIN" retention --vault "$VAULT" --json)
 case "$out" in
     *'"candidate_count":1'*'"deleted_count":0'*'"kept_count":1'*'"skipped_count":1'*) ;;
     *) fail "unexpected report output: $out" ;;
@@ -62,11 +64,11 @@ esac
 assert_file "${VAULT}/1_draft/_archived/research/old.md"
 report="${VAULT}/3_intelligence/report/maintenance/retention-$(date -u '+%Y-%m-%d').json"
 assert_file "$report"
-assert_contains "$report" '"action":"candidate"'
-assert_contains "$report" '"action":"kept"'
-assert_contains "$report" '"action":"skipped"'
+assert_contains "$report" '"action": "candidate"'
+assert_contains "$report" '"action": "kept"'
+assert_contains "$report" '"action": "skipped"'
 
-out=$("${VAULT}/0_core/script/retention.sh" --vault "$VAULT" --apply --json)
+out=$("$STRATA_BIN" retention --vault "$VAULT" --apply --json)
 case "$out" in
     *'"candidate_count":0'*'"deleted_count":1'*'"kept_count":1'*'"skipped_count":1'*) ;;
     *) fail "unexpected apply output: $out" ;;
@@ -75,6 +77,6 @@ esac
 assert_missing "${VAULT}/1_draft/_archived/research/old.md"
 assert_file "${VAULT}/1_draft/_archived/research/new.md"
 assert_file "${VAULT}/1_draft/_archived/research/missing.md"
-assert_contains "$report" '"action":"deleted"'
+assert_contains "$report" '"action": "deleted"'
 
-printf 'ok - retention passed\n'
+printf 'ok - rust retention passed\n'

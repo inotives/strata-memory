@@ -1,4 +1,14 @@
-use rusqlite::{params, Connection, OptionalExtension, Transaction};
+mod agents;
+mod cli;
+mod config;
+mod db;
+mod doctor;
+mod lifecycle;
+mod review;
+mod vault;
+
+use cli::{Command, IndexMode, SearchArgs};
+use rusqlite::{params, Connection, Transaction};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::error::Error;
@@ -8,34 +18,6 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
-
-#[derive(Debug)]
-struct Cli {
-    command: Command,
-    vault: PathBuf,
-    json: bool,
-}
-
-#[derive(Debug)]
-enum Command {
-    Index(IndexMode),
-    Search(SearchArgs),
-    LinkReview,
-}
-
-#[derive(Debug)]
-enum IndexMode {
-    Full,
-    Target(PathBuf),
-}
-
-#[derive(Debug)]
-struct SearchArgs {
-    query: String,
-    limit: usize,
-    include_archived: bool,
-    paths_only: bool,
-}
 
 #[derive(Debug)]
 struct Document {
@@ -84,9 +66,21 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-    let cli = parse_args(env::args().skip(1).collect())?;
+    let cli = cli::parse_args(env::args().skip(1).collect())?;
 
     match cli.command {
+        Command::AgentsGenerate => {
+            let summary = agents::generate(&cli.vault)?;
+            if cli.json {
+                println!(
+                    "{{\"ok\":true,\"path\":\"{}\",\"profile\":\"{}\"}}",
+                    json_escape(&summary.path),
+                    json_escape(&summary.profile)
+                );
+            } else {
+                println!("Generated AGENTS.md for profile: {}", summary.profile);
+            }
+        }
         Command::Index(mode) => {
             let indexed = index(&cli.vault, mode)?;
             if cli.json {
@@ -99,132 +93,146 @@ fn run() -> Result<()> {
             search(&cli.vault, &search_args, cli.json)?;
         }
         Command::LinkReview => {
-            link_review(&cli.vault, cli.json)?;
+            review::link_review(&cli.vault, cli.json)?;
+        }
+        Command::PrivacyReview => {
+            review::privacy_review(&cli.vault, cli.json)?;
+        }
+        Command::TagReview => {
+            review::tag_review(&cli.vault, cli.json)?;
+        }
+        Command::RoomReview => {
+            review::room_review(&cli.vault, cli.json)?;
+        }
+        Command::Doctor => {
+            doctor::run(&cli.vault, cli.json)?;
+        }
+        Command::DbMigrate => {
+            let applied = db::migrate(&cli.vault)?;
+            let db_path = cli.vault.join("0_core/db/strata.db");
+            if cli.json {
+                println!(
+                    "{{\"ok\":true,\"db\":\"{}\",\"applied\":{applied}}}",
+                    json_escape(&db_path.to_string_lossy())
+                );
+            } else {
+                println!(
+                    "Database migrated: {} ({applied} applied)",
+                    db_path.to_string_lossy()
+                );
+            }
+        }
+        Command::Init => {
+            vault::init(&cli.vault)?;
+            if cli.json {
+                println!(
+                    "{{\"ok\":true,\"vault\":\"{}\"}}",
+                    json_escape(&cli.vault.to_string_lossy())
+                );
+            } else {
+                println!(
+                    "Initialized Strata-Memory vault: {}",
+                    cli.vault.to_string_lossy()
+                );
+            }
+        }
+        Command::ConfigCompile => {
+            let summary = config::compile(&cli.vault)?;
+            if cli.json {
+                println!(
+                    "{{\"ok\":true,\"cache\":\"{}\",\"profile\":\"{}\",\"rooms\":{},\"tags\":{}}}",
+                    json_escape(&summary.cache.to_string_lossy()),
+                    json_escape(&summary.profile),
+                    summary.rooms,
+                    summary.tags
+                );
+            } else {
+                println!("Compiled config: {}", summary.cache.to_string_lossy());
+            }
+        }
+        Command::Normalize(args) => {
+            match lifecycle::normalize(&cli.vault, &args.target, args.check) {
+                Ok(summary) => {
+                    if cli.json {
+                        println!(
+                            "{{\"ok\":true,\"path\":\"{}\",\"strata\":\"{}\",\"status\":\"{}\"}}",
+                            json_escape(&summary.path),
+                            json_escape(&summary.strata),
+                            json_escape(&summary.status)
+                        );
+                    } else if args.check {
+                        println!("Normalized check passed: {}", summary.path);
+                    } else {
+                        println!("Normalized: {}", summary.path);
+                    }
+                }
+                Err(err) if cli.json && err.to_string().contains("description is required") => {
+                    let abs = absolute_path(&args.target)?;
+                    let rel = rel_path(&abs, &cli.vault)
+                        .unwrap_or_else(|| abs.to_string_lossy().to_string());
+                    println!(
+                        "{{\"ok\":false,\"error\":\"description_required\",\"path\":\"{}\"}}",
+                        json_escape(&rel)
+                    );
+                    return Err(err);
+                }
+                Err(err) => return Err(err),
+            }
+        }
+        Command::Promote(args) => {
+            let summary =
+                lifecycle::promote(&cli.vault, &args.source, &args.to, args.new_slug.as_deref())?;
+            index(
+                &cli.vault,
+                IndexMode::Target(cli.vault.join(&summary.target)),
+            )?;
+            index(
+                &cli.vault,
+                IndexMode::Target(cli.vault.join(&summary.archive)),
+            )?;
+            if cli.json {
+                println!(
+                    "{{\"ok\":true,\"target\":\"{}\",\"archive\":\"{}\",\"log\":\"{}\"}}",
+                    json_escape(&summary.target),
+                    json_escape(&summary.archive),
+                    json_escape(&summary.log)
+                );
+            } else {
+                println!("Promoted: {}", summary.target);
+                println!("Archived: {}", summary.archive);
+            }
+        }
+        Command::Retention(args) => {
+            let summary = lifecycle::retention(&cli.vault, args.apply)?;
+            if cli.json {
+                println!(
+                    "{{\"ok\":true,\"report\":\"{}\",\"mode\":\"{}\",\"candidate_count\":{},\"deleted_count\":{},\"kept_count\":{},\"skipped_count\":{}}}",
+                    json_escape(&summary.report),
+                    json_escape(&summary.mode),
+                    summary.candidate_count,
+                    summary.deleted_count,
+                    summary.kept_count,
+                    summary.skipped_count
+                );
+            } else {
+                println!(
+                    "Retention {} complete: {} candidate, {} deleted, {} kept, {} skipped",
+                    summary.mode,
+                    summary.candidate_count,
+                    summary.deleted_count,
+                    summary.kept_count,
+                    summary.skipped_count
+                );
+                println!("Report: {}", summary.report);
+            }
         }
     }
 
     Ok(())
 }
 
-fn parse_args(args: Vec<String>) -> Result<Cli> {
-    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
-        print_usage();
-        std::process::exit(0);
-    }
-
-    let mut iter = args.into_iter();
-    let mut vault = env::var("STRATA_VAULT")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| home_dir().join(".strata-memory"));
-    let mut json = false;
-    let command = iter.next().ok_or("missing command")?;
-
-    let parsed_command = match command.as_str() {
-        "index" => {
-            let mut full = false;
-            let mut target: Option<PathBuf> = None;
-
-            while let Some(arg) = iter.next() {
-                match arg.as_str() {
-                    "--full" => full = true,
-                    "--target" => {
-                        let value = iter.next().ok_or("--target requires FILE")?;
-                        target = Some(PathBuf::from(value));
-                    }
-                    "--vault" => {
-                        let value = iter.next().ok_or("--vault requires PATH")?;
-                        vault = PathBuf::from(value);
-                    }
-                    "--json" => json = true,
-                    other => return Err(format!("unknown argument: {other}").into()),
-                }
-            }
-
-            let mode = match (full, target) {
-                (true, Some(_)) => return Err("use either --target or --full, not both".into()),
-                (true, None) => IndexMode::Full,
-                (false, Some(path)) => IndexMode::Target(path),
-                (false, None) => IndexMode::Full,
-            };
-            Command::Index(mode)
-        }
-        "search" => {
-            let mut query: Option<String> = None;
-            let mut limit = 10;
-            let mut include_archived = false;
-            let mut paths_only = false;
-
-            while let Some(arg) = iter.next() {
-                match arg.as_str() {
-                    "--query" | "-q" => {
-                        query = Some(iter.next().ok_or("--query requires TEXT")?);
-                    }
-                    "--vault" => {
-                        let value = iter.next().ok_or("--vault requires PATH")?;
-                        vault = PathBuf::from(value);
-                    }
-                    "--limit" => {
-                        let value = iter.next().ok_or("--limit requires N")?;
-                        limit = value
-                            .parse::<usize>()
-                            .map_err(|_| "limit must be a positive integer")?;
-                    }
-                    "--include-archived" => include_archived = true,
-                    "--paths-only" => paths_only = true,
-                    "--json" => json = true,
-                    other if query.is_none() => query = Some(other.to_string()),
-                    other => return Err(format!("unknown argument: {other}").into()),
-                }
-            }
-
-            if limit == 0 {
-                return Err("limit must be a positive integer".into());
-            }
-
-            Command::Search(SearchArgs {
-                query: query.ok_or("missing search query")?,
-                limit,
-                include_archived,
-                paths_only,
-            })
-        }
-        "link-review" => {
-            while let Some(arg) = iter.next() {
-                match arg.as_str() {
-                    "--vault" => {
-                        let value = iter.next().ok_or("--vault requires PATH")?;
-                        vault = PathBuf::from(value);
-                    }
-                    "--json" => json = true,
-                    other => return Err(format!("unknown argument: {other}").into()),
-                }
-            }
-            Command::LinkReview
-        }
-        _ => return Err(format!("unknown command: {command}").into()),
-    };
-
-    Ok(Cli {
-        command: parsed_command,
-        vault,
-        json,
-    })
-}
-
-fn print_usage() {
-    println!("Usage: strata index [--target FILE | --full] [--vault PATH] [--json]");
-    println!("       strata search --query TEXT [--vault PATH] [--limit N] [--include-archived] [--paths-only] [--json]");
-    println!("       strata link-review [--vault PATH] [--json]");
-}
-
-fn home_dir() -> PathBuf {
-    env::var("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("."))
-}
-
 fn index(vault: &Path, mode: IndexMode) -> Result<usize> {
-    migrate(vault)?;
+    db::migrate(vault)?;
 
     let db_path = vault.join("0_core/db/strata.db");
     let mut conn = Connection::open(db_path)?;
@@ -243,7 +251,7 @@ fn index(vault: &Path, mode: IndexMode) -> Result<usize> {
 fn search(vault: &Path, args: &SearchArgs, json: bool) -> Result<()> {
     let db_path = vault.join("0_core/db/strata.db");
     if !db_path.is_file() {
-        return Err("database not found; run index.sh first".into());
+        return Err("database not found; run strata index first".into());
     }
 
     let conn = Connection::open(db_path)?;
@@ -346,250 +354,6 @@ struct SearchResult {
     status: String,
     rank: String,
     snippet: String,
-}
-
-fn link_review(vault: &Path, json: bool) -> Result<()> {
-    let files = collect_review_markdown_files(vault)?;
-    let mut issues = Vec::new();
-
-    for file in files {
-        let abs = absolute_path(&file)?;
-        let Some(rel) = rel_path(&abs, vault) else {
-            continue;
-        };
-        let content = fs::read_to_string(&abs)?;
-        for link in extract_review_links(&content) {
-            if let Some(reason) = link_issue_reason(vault, &rel, &link) {
-                issues.push(LinkIssue {
-                    severity: severity_for_path(&rel).to_string(),
-                    reason,
-                    path: rel.clone(),
-                    target: link.target,
-                    line: link.line,
-                });
-            }
-        }
-    }
-
-    let error_count = issues
-        .iter()
-        .filter(|issue| issue.severity == "error")
-        .count();
-
-    if json {
-        print!(
-            "{{\"ok\":{},\"issue_count\":{},\"error_count\":{},\"issues\":[",
-            if error_count == 0 { "true" } else { "false" },
-            issues.len(),
-            error_count
-        );
-        for (idx, issue) in issues.iter().enumerate() {
-            if idx > 0 {
-                print!(",");
-            }
-            print!(
-                "{{\"severity\":\"{}\",\"reason\":\"{}\",\"path\":\"{}\",\"target\":\"{}\",\"line\":{}}}",
-                json_escape(&issue.severity),
-                json_escape(&issue.reason),
-                json_escape(&issue.path),
-                json_escape(&issue.target),
-                issue.line
-            );
-        }
-        println!("]}}");
-    } else if issues.is_empty() {
-        println!("No link issues found");
-    } else {
-        println!("Link issues:");
-        for issue in &issues {
-            println!(
-                "{} {} {}:{} -> {}",
-                issue.severity, issue.reason, issue.path, issue.line, issue.target
-            );
-        }
-    }
-
-    if error_count > 0 {
-        return Err("link review found durable link errors".into());
-    }
-
-    Ok(())
-}
-
-fn collect_review_markdown_files(vault: &Path) -> Result<Vec<PathBuf>> {
-    let mut files = Vec::new();
-    for rel in ["1_draft", "2_knowledge", "3_intelligence"] {
-        let root = vault.join(rel);
-        if root.is_dir() {
-            collect_markdown_files_rec(&root, &mut files)?;
-        }
-    }
-    files.sort();
-    Ok(files)
-}
-
-#[derive(Debug)]
-struct ReviewLink {
-    kind: LinkKind,
-    target: String,
-    line: i64,
-}
-
-#[derive(Debug)]
-enum LinkKind {
-    Markdown,
-    WikiLink,
-}
-
-#[derive(Debug)]
-struct LinkIssue {
-    severity: String,
-    reason: String,
-    path: String,
-    target: String,
-    line: i64,
-}
-
-fn extract_review_links(content: &str) -> Vec<ReviewLink> {
-    let mut links = Vec::new();
-    for (line_idx, line) in content.lines().enumerate() {
-        let line_no = (line_idx + 1) as i64;
-        let mut rest = line;
-        while let Some(open_text) = rest.find('[') {
-            rest = &rest[open_text + 1..];
-            let Some(close_text) = rest.find("](") else {
-                continue;
-            };
-            rest = &rest[close_text + 2..];
-            let Some(close_target) = rest.find(')') else {
-                break;
-            };
-            let target = &rest[..close_target];
-            rest = &rest[close_target + 1..];
-            links.push(ReviewLink {
-                kind: LinkKind::Markdown,
-                target: target.to_string(),
-                line: line_no,
-            });
-        }
-
-        let mut rest = line;
-        while let Some(open) = rest.find("[[") {
-            rest = &rest[open + 2..];
-            let Some(close) = rest.find("]]") else {
-                break;
-            };
-            let target = &rest[..close];
-            rest = &rest[close + 2..];
-            links.push(ReviewLink {
-                kind: LinkKind::WikiLink,
-                target: target.to_string(),
-                line: line_no,
-            });
-        }
-    }
-    links
-}
-
-fn link_issue_reason(vault: &Path, source_path: &str, link: &ReviewLink) -> Option<String> {
-    match link.kind {
-        LinkKind::WikiLink => Some("wikilink_not_allowed".to_string()),
-        LinkKind::Markdown => {
-            if link.target.starts_with("file://") {
-                return Some("file_url_not_allowed".to_string());
-            }
-            if link.target.starts_with('/') {
-                return Some("absolute_path_not_allowed".to_string());
-            }
-            if link.target.starts_with("http://") || link.target.starts_with("https://") {
-                return None;
-            }
-
-            let clean = link
-                .target
-                .split('#')
-                .next()
-                .unwrap_or("")
-                .split('?')
-                .next()
-                .unwrap_or("");
-            if clean.is_empty() {
-                return None;
-            }
-
-            let source_dir = Path::new(source_path)
-                .parent()
-                .unwrap_or_else(|| Path::new(""));
-            let candidate = vault.join(source_dir).join(clean);
-            if candidate.is_file() {
-                None
-            } else {
-                Some("broken_local_link".to_string())
-            }
-        }
-    }
-}
-
-fn severity_for_path(path: &str) -> &'static str {
-    if path.starts_with("1_draft/") {
-        "warn"
-    } else {
-        "error"
-    }
-}
-
-fn migrate(vault: &Path) -> Result<()> {
-    let db_path = vault.join("0_core/db/strata.db");
-    if let Some(parent) = db_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-
-    let conn = Connection::open(db_path)?;
-    let schema = fs::read_to_string(vault.join("0_core/db/schema.sql"))?;
-    conn.execute_batch(&schema)?;
-
-    let migrations_dir = vault.join("0_core/db/migrations");
-    let mut migrations = Vec::new();
-    if migrations_dir.is_dir() {
-        for entry in fs::read_dir(migrations_dir)? {
-            let entry = entry?;
-            if entry.file_type()?.is_file()
-                && entry.path().extension().and_then(|ext| ext.to_str()) == Some("sql")
-            {
-                migrations.push(entry.path());
-            }
-        }
-    }
-    migrations.sort();
-
-    for migration in migrations {
-        let Some(name) = migration.file_name().and_then(|name| name.to_str()) else {
-            continue;
-        };
-        let Some(version) = name.split('_').next() else {
-            continue;
-        };
-
-        let applied: Option<String> = conn
-            .query_row(
-                "SELECT version FROM schema_migrations WHERE version = ?1 LIMIT 1",
-                params![version],
-                |row| row.get(0),
-            )
-            .optional()?;
-        if applied.is_some() {
-            continue;
-        }
-
-        let sql = fs::read_to_string(&migration)?;
-        conn.execute_batch(&sql)?;
-        conn.execute(
-            "INSERT INTO schema_migrations (version, applied_at) VALUES (?1, strftime('%Y-%m-%dT%H:%M:%SZ','now'))",
-            params![version],
-        )?;
-    }
-
-    Ok(())
 }
 
 fn index_full(conn: &mut Connection, vault: &Path) -> Result<usize> {

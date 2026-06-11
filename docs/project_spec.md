@@ -312,7 +312,7 @@ Promotion steps:
 4. Validate hashes, frontmatter, and links.
 5. Move candidates into final vault paths.
 6. Remove original draft only after final files exist.
-7. Run `index.sh --target` for the promoted artifact and archived draft.
+7. Run `strata index --target` for the promoted artifact and archived draft.
 8. Write an operation log.
 9. Delete temp files on success. Leave temp files on failure and print their path.
 
@@ -328,7 +328,7 @@ retention:
   default_mode: report
 ```
 
-`retention.sh` defaults to report-only. Deletion requires `--apply`.
+`strata retention` defaults to report-only. Deletion requires `--apply`.
 
 Deletion logs are kept indefinitely:
 
@@ -342,7 +342,7 @@ Deletion logs are kept indefinitely:
 
 Tags are controlled by config. Unknown tags warn in drafts and are reviewed at promotion.
 
-`tag-review.sh` detects:
+`strata tag-review` detects:
 
 - exact case-insensitive matches
 - singular/plural matches
@@ -373,7 +373,7 @@ rooms:
         - archived
 ```
 
-Unregistered folders are not invalid, but they are outside the official navigation contract. They are indexed with warnings, reported by `room-review.sh`, and excluded from generated `AGENTS.md` room descriptions until registered.
+Unregistered folders are not invalid, but they are outside the official navigation contract. They are indexed with warnings, reported by `strata room-review`, and excluded from generated `AGENTS.md` room descriptions until registered.
 
 ### 9.3 Profiles
 
@@ -553,21 +553,21 @@ MVP commands:
 
 ```text
 install.sh
-0_core/script/init.sh
-0_core/script/doctor.sh
-0_core/script/config-compile.sh
-0_core/script/db-migrate.sh
-0_core/script/normalize.sh
-0_core/script/index.sh
-0_core/script/promote.sh
-0_core/script/search.sh
-0_core/script/tag-review.sh
-0_core/script/room-review.sh
-0_core/script/link-review.sh
-0_core/script/agents-generate.sh
+0_core/bin/strata init
+0_core/bin/strata doctor
+0_core/bin/strata config-compile
+0_core/bin/strata db-migrate
+0_core/bin/strata normalize
+0_core/bin/strata index
+0_core/bin/strata promote
+0_core/bin/strata search
+0_core/bin/strata tag-review
+0_core/bin/strata room-review
+0_core/bin/strata link-review
+0_core/bin/strata agents-generate
 0_core/script/migration.sh
-0_core/script/retention.sh
-0_core/script/privacy-review.sh
+0_core/bin/strata retention
+0_core/bin/strata privacy-review
 ```
 
 Shared libraries:
@@ -606,7 +606,7 @@ yq
 jq
 ```
 
-`init.sh` checks dependencies and prints install guidance. It does not install packages automatically.
+`strata init` checks dependencies and prints install guidance. It does not install packages automatically.
 
 Temporary files must live under `0_core/tmp/`, using `mktemp` with a vault-local template:
 
@@ -622,22 +622,22 @@ Target installed shape:
 
 ```text
 0_core/bin/strata
-0_core/script/index.sh
-0_core/script/search.sh
-0_core/script/doctor.sh
+0_core/bin/strata index
+0_core/bin/strata search
+0_core/bin/strata doctor
 ```
 
 Shell scripts keep the public command surface stable and delegate to the Rust binary when available:
 
 ```bash
-0_core/script/index.sh --full --vault ~/.strata-memory --json
+0_core/bin/strata index --full --vault ~/.strata-memory --json
 0_core/bin/strata index --full --vault ~/.strata-memory --json
 ```
 
 Rust migration order:
 
 1. Implement `strata index` first, because indexing is the slowest current path.
-2. Preserve `index.sh` behavior for `--target`, `--full`, `--vault`, and `--json`.
+2. Preserve `strata index` behavior for `--target`, `--full`, `--vault`, and `--json`.
 3. Use one process, one SQLite connection, one full-index transaction, and prepared statements.
 4. Add stderr progress output every N files after basic parity is stable, controlled by `STRATA_INDEX_PROGRESS_EVERY` for non-interactive runs.
 5. Keep Bash index behavior as a reference/fallback until fixture and real-vault parity are proven.
@@ -670,7 +670,7 @@ Default `.gitignore` should exclude:
 
 `1_draft` is tracked by default in new Strata vaults because active and archived drafts are provenance.
 
-`privacy-review.sh` warns about:
+`strata privacy-review` warns about:
 
 - absolute home paths
 - `file://` links
@@ -771,7 +771,7 @@ Linux-only acceptance for MVP:
 6. Detect and review unknown tags.
 7. Detect unregistered rooms.
 8. Generate `AGENTS.md` from template/profile/manual block.
-9. Run `doctor.sh` successfully.
+9. Run `strata doctor` successfully.
 10. Run section migration from `~/.agent-knowledge/memory` without modifying old memory.
 
 macOS support remains a design constraint and post-MVP validation target.

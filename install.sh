@@ -61,6 +61,40 @@ copy_tree() {
     )
 }
 
+create_vault_dirs() {
+    for rel in \
+        "0_core/config" \
+        "0_core/cache" \
+        "0_core/db/migrations" \
+        "0_core/doc" \
+        "0_core/script/lib" \
+        "0_core/template" \
+        "0_core/template_override" \
+        "0_core/test/tmp" \
+        "0_core/tmp" \
+        "1_draft/research" \
+        "1_draft/note" \
+        "1_draft/skill" \
+        "1_draft/agent" \
+        "1_draft/workflow" \
+        "1_draft/session" \
+        "1_draft/_archived" \
+        "2_knowledge/concept" \
+        "2_knowledge/entity" \
+        "2_knowledge/research" \
+        "2_knowledge/note" \
+        "2_knowledge/preference" \
+        "2_knowledge/_archived" \
+        "3_intelligence/skill" \
+        "3_intelligence/agent" \
+        "3_intelligence/workflow" \
+        "3_intelligence/report" \
+        "3_intelligence/_archived"
+    do
+        mkdir -p "${VAULT}/${rel}"
+    done
+}
+
 write_manifest() {
     local manifest="${CORE}/manifest.json"
     local now
@@ -87,8 +121,7 @@ write_manifest() {
 }
 
 mkdir -p "$CORE"
-
-"${SRC_DIR}/script/init.sh" --vault "$VAULT" >/dev/null
+create_vault_dirs
 
 copy_tree "${SRC_DIR}/script" "${CORE}/script"
 copy_tree "${SRC_DIR}/db" "${CORE}/db"

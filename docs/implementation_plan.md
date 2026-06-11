@@ -46,31 +46,31 @@ Implementation steps:
    - `platform.sh`
    - `sqlite.sh`
    - `log.sh`
-2. Implement `init.sh` to create vault structure and bootstrap config.
-3. Implement `config-compile.sh` using `yq` and `jq` for full mode.
-4. Implement `db-migrate.sh` and initial schema migration.
-5. Implement `normalize.sh` for constrained YAML frontmatter.
-6. Implement `index.sh` for full scan and target indexing.
+2. Implement `strata init` to create vault structure and bootstrap config.
+3. Implement `strata config-compile` using `yq` and `jq` for full mode.
+4. Implement `strata db-migrate` and initial schema migration.
+5. Implement `strata normalize` for constrained YAML frontmatter.
+6. Implement `strata index` for full scan and target indexing.
 7. Implement FTS5 search, link extraction, section extraction, and stale row cleanup.
-8. Implement `search.sh` with weighted ranking, snippets, filters, and `--json`.
-9. Implement `tag-review.sh`, `room-review.sh`, and `link-review.sh`.
-10. Implement `promote.sh` with vault-local temp handling, archival, no overwrite, and re-indexing.
-11. Implement `agents-generate.sh` from templates/profiles/manual blocks.
-12. Implement `doctor.sh`.
-13. Implement `retention.sh` report mode and `--apply`.
-14. Implement warning-only `privacy-review.sh`.
+8. Implement `strata search` with weighted ranking, snippets, filters, and `--json`.
+9. Implement `strata tag-review`, `strata room-review`, and `strata link-review`.
+10. Implement `strata promote` with vault-local temp handling, archival, no overwrite, and re-indexing.
+11. Implement `strata agents-generate` from templates/profiles/manual blocks.
+12. Implement `strata doctor`.
+13. Implement `strata retention` report mode and `--apply`.
+14. Implement warning-only `strata privacy-review`.
 
 Testing steps:
 
-1. `init.sh` creates expected folders and DB schema in fixture vault.
-2. `config-compile.sh` validates nested rooms/profiles/tags and writes cache.
-3. `normalize.sh` handles:
+1. `strata init` creates expected folders and DB schema in fixture vault.
+2. `strata config-compile` validates nested rooms/profiles/tags and writes cache.
+3. `strata normalize` handles:
    - missing frontmatter
    - partial frontmatter
    - quoted timestamps
    - empty draft descriptions
    - missing durable descriptions as validation errors
-4. `index.sh` handles:
+4. `strata index` handles:
    - target indexing
    - full scan
    - FTS rows
@@ -78,26 +78,26 @@ Testing steps:
    - section rows
    - stale path removal
    - archived exclusion by default
-5. `search.sh` verifies:
+5. `strata search` verifies:
    - title matches rank above body matches
    - snippets are compact
    - `--json` is valid JSON
    - `--include-archived` works
    - `--paths-only` works
-6. `tag-review.sh` detects similar tags.
-7. `room-review.sh` flags unregistered rooms and respects recursive roots.
-8. `link-review.sh` blocks broken durable links and warns in drafts.
-9. `promote.sh` verifies:
+6. `strata tag-review` detects similar tags.
+7. `strata room-review` flags unregistered rooms and respects recursive roots.
+8. `strata link-review` blocks broken durable links and warns in drafts.
+9. `strata promote` verifies:
    - target creation
    - draft archival
    - original deletion after successful final writes
    - no overwrite by default
    - `--new-slug`
    - failed operations leave original intact when possible
-10. `agents-generate.sh` preserves manual blocks and updates generated sections.
-11. `doctor.sh` reports a healthy fixture vault.
-12. `retention.sh` reports candidates without deleting by default and deletes only with `--apply`.
-13. `privacy-review.sh` reports warnings without blocking.
+10. `strata agents-generate` preserves manual blocks and updates generated sections.
+11. `strata doctor` reports a healthy fixture vault.
+12. `strata retention` reports candidates without deleting by default and deletes only with `--apply`.
+13. `strata privacy-review` reports warnings without blocking.
 
 Exit criteria:
 
@@ -158,12 +158,12 @@ Goal: stabilize the migrated private vault before adding background automation.
 
 Implementation steps:
 
-1. Run `doctor.sh` against the migrated private vault.
-2. Run `room-review.sh` and register approved rooms.
-3. Run `tag-review.sh` and approve replacements/new tags.
-4. Run `link-review.sh` and fix broken local links.
+1. Run `strata doctor` against the migrated private vault.
+2. Run `strata room-review` and register approved rooms.
+3. Run `strata tag-review` and approve replacements/new tags.
+4. Run `strata link-review` and fix broken local links.
 5. Review `_unmapped` content and move/register it.
-6. Run `privacy-review.sh`.
+6. Run `strata privacy-review`.
 7. Generate final `AGENTS.md`.
 8. Run full re-index.
 9. Create a migration validation report.

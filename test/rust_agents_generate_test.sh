@@ -4,7 +4,7 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 TMP_ROOT="${ROOT}/test/tmp"
 mkdir -p "$TMP_ROOT"
-VAULT=$(mktemp -d "${TMP_ROOT}/agents-generate-test-XXXXXXXX")
+VAULT=$(mktemp -d "${TMP_ROOT}/rust-agents-generate-test-XXXXXXXX")
 trap 'rm -rf "$VAULT"' EXIT HUP INT TERM
 
 fail() {
@@ -41,7 +41,10 @@ keep this manual instruction
 <!-- STRATA_MANUAL_END -->
 EOF
 
-"${VAULT}/0_core/script/agents-generate.sh" --vault "$VAULT" >/dev/null
+STRATA_BIN="${ROOT}/src/rust/strata/target/debug/strata"
+cargo build --manifest-path "${ROOT}/src/rust/strata/Cargo.toml" >/dev/null
+
+"$STRATA_BIN" agents-generate --vault "$VAULT" >/dev/null
 assert_contains "${VAULT}/AGENTS.md" '# Strata-Memory'
 assert_contains "${VAULT}/AGENTS.md" '0_core/template/draft/research-draft.md'
 assert_contains "${VAULT}/AGENTS.md" 'Profile: `coder`'
@@ -53,7 +56,7 @@ assert_count "${VAULT}/AGENTS.md" '<!-- STRATA_GENERATED_START -->' 1
 assert_count "${VAULT}/AGENTS.md" '<!-- STRATA_MANUAL_START -->' 1
 
 sed -i 's/profile: "coder"/profile: "trader"/' "${VAULT}/0_core/config/configs.yaml"
-json=$("${VAULT}/0_core/script/agents-generate.sh" --vault "$VAULT" --json)
+json=$("$STRATA_BIN" agents-generate --vault "$VAULT" --json)
 case "$json" in
     *'"profile":"trader"'*) ;;
     *) fail "expected trader json: $json" ;;
@@ -62,4 +65,4 @@ assert_contains "${VAULT}/AGENTS.md" 'Profile: `trader`'
 assert_contains "${VAULT}/AGENTS.md" '- `entity/stock/*`'
 assert_contains "${VAULT}/AGENTS.md" 'keep this manual instruction'
 
-printf 'ok - agents generate passed\n'
+printf 'ok - rust agents generate passed\n'

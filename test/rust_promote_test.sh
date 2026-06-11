@@ -4,7 +4,7 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 TMP_ROOT="${ROOT}/test/tmp"
 mkdir -p "$TMP_ROOT"
-VAULT=$(mktemp -d "${TMP_ROOT}/promote-test-XXXXXXXX")
+VAULT=$(mktemp -d "${TMP_ROOT}/rust-promote-test-XXXXXXXX")
 trap 'rm -rf "$VAULT"' EXIT HUP INT TERM
 
 fail() {
@@ -34,6 +34,9 @@ assert_eq() {
 }
 
 "${ROOT}/install.sh" --vault "$VAULT" >/dev/null
+STRATA_BIN="${ROOT}/src/rust/strata/target/debug/strata"
+cargo build --manifest-path "${ROOT}/src/rust/strata/Cargo.toml" >/dev/null
+
 mkdir -p "${VAULT}/1_draft/research" "${VAULT}/2_knowledge/research"
 
 cat > "${VAULT}/1_draft/research/sqlite-fts.md" <<'EOF'
@@ -52,7 +55,7 @@ created: "2026-06-06"
 Draft body.
 EOF
 
-out=$("${VAULT}/0_core/script/promote.sh" --vault "$VAULT" --source "${VAULT}/1_draft/research/sqlite-fts.md" --to 2_knowledge --json)
+out=$("$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/sqlite-fts.md" --to 2_knowledge --json)
 case "$out" in
     *'"ok":true'*) ;;
     *) fail "expected json promote success: $out" ;;
@@ -101,13 +104,71 @@ tags:
 # Duplicate
 EOF
 
-if "${VAULT}/0_core/script/promote.sh" --vault "$VAULT" --source "${VAULT}/1_draft/research/conflict.md" --to 2_knowledge >/dev/null 2>&1; then
+if "$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/conflict.md" --to 2_knowledge >/dev/null 2>&1; then
     fail "expected overwrite promotion to fail"
 fi
 assert_file "${VAULT}/1_draft/research/conflict.md"
 
-"${VAULT}/0_core/script/promote.sh" --vault "$VAULT" --source "${VAULT}/1_draft/research/conflict.md" --to 2_knowledge --new-slug duplicate-note >/dev/null
+"$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/conflict.md" --to 2_knowledge --new-slug duplicate-note >/dev/null
 assert_file "${VAULT}/2_knowledge/research/duplicate-note.md"
 assert_file "${VAULT}/1_draft/_archived/research/conflict.md"
 
-printf 'ok - promote passed\n'
+mkdir -p "${VAULT}/1_draft/trading"
+cat > "${VAULT}/1_draft/trading/website-source.md" <<'EOF'
+---
+title: "Website Source"
+description: "Promote into a concrete knowledge room."
+status: "pending"
+tags:
+  - research
+---
+# Website Source
+EOF
+
+out=$("$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/trading/website-source.md" --to 2_knowledge/entity/website --json)
+case "$out" in
+    *'"target":"2_knowledge/entity/website/website-source.md"'*) ;;
+    *) fail "expected concrete room target: $out" ;;
+esac
+assert_file "${VAULT}/2_knowledge/entity/website/website-source.md"
+assert_file "${VAULT}/1_draft/_archived/trading/website-source.md"
+assert_contains "${VAULT}/2_knowledge/entity/website/website-source.md" 'strata: "2_knowledge"'
+
+cat > "${VAULT}/1_draft/research/intelligence-skill.md" <<'EOF'
+---
+title: "Intelligence Skill"
+description: "Promote into a concrete intelligence room."
+status: "pending"
+tags:
+  - skill
+---
+# Intelligence Skill
+EOF
+
+out=$("$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/intelligence-skill.md" --to 3_intelligence/skill/trading --new-slug price-fetch-note --json)
+case "$out" in
+    *'"target":"3_intelligence/skill/trading/price-fetch-note.md"'*) ;;
+    *) fail "expected concrete intelligence target: $out" ;;
+esac
+assert_file "${VAULT}/3_intelligence/skill/trading/price-fetch-note.md"
+assert_file "${VAULT}/1_draft/_archived/research/intelligence-skill.md"
+assert_contains "${VAULT}/3_intelligence/skill/trading/price-fetch-note.md" 'strata: "3_intelligence"'
+
+cat > "${VAULT}/1_draft/research/unsafe.md" <<'EOF'
+---
+title: "Unsafe"
+description: "Unsafe target should be rejected."
+status: "pending"
+tags:
+  - research
+---
+# Unsafe
+EOF
+
+if "$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/unsafe.md" --to 2_knowledge/../3_intelligence >/dev/null 2>&1; then
+    fail "expected unsafe promotion target to fail"
+fi
+assert_file "${VAULT}/1_draft/research/unsafe.md"
+assert_missing "${VAULT}/3_intelligence/unsafe.md"
+
+printf 'ok - rust promote passed\n'

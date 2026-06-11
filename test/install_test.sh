@@ -26,15 +26,18 @@ assert_contains() {
     grep -F "$needle" "$file" >/dev/null 2>&1 || fail "expected '$needle' in $file"
 }
 
+cargo build --release --manifest-path "${ROOT}/src/rust/strata/Cargo.toml" >/dev/null
 "${ROOT}/install.sh" --vault "$VAULT" >/dev/null
 
 assert_dir "${VAULT}/0_core/script/lib"
+assert_dir "${VAULT}/0_core/bin"
 assert_dir "${VAULT}/0_core/template_override"
 assert_dir "${VAULT}/1_draft/research"
 assert_dir "${VAULT}/2_knowledge/entity"
 assert_dir "${VAULT}/3_intelligence/workflow"
-assert_file "${VAULT}/0_core/script/init.sh"
-assert_file "${VAULT}/0_core/script/lib/platform.sh"
+assert_file "${VAULT}/0_core/bin/strata"
+assert_file "${VAULT}/0_core/script/migration.sh"
+assert_file "${VAULT}/0_core/script/lib/paths.sh"
 assert_file "${VAULT}/0_core/config/configs.yaml"
 assert_file "${VAULT}/0_core/db/schema.sql"
 assert_file "${VAULT}/0_core/db/migrations/001_init.sql"
@@ -52,6 +55,7 @@ printf '%s\n' 'user content' > "${VAULT}/2_knowledge/concept/user.md"
 assert_contains "${VAULT}/0_core/config/configs.yaml" "user_config: true"
 assert_contains "${VAULT}/2_knowledge/concept/user.md" "user content"
 assert_contains "${VAULT}/0_core/manifest.json" '"managed_root": "0_core"'
-assert_contains "${VAULT}/0_core/manifest.json" '"path":"0_core/script/init.sh"'
+assert_contains "${VAULT}/0_core/manifest.json" '"path":"0_core/bin/strata"'
+assert_contains "${VAULT}/0_core/manifest.json" '"path":"0_core/script/migration.sh"'
 
 printf 'ok - install fixture passed\n'
