@@ -2,6 +2,7 @@ mod agents;
 mod cli;
 mod config;
 mod db;
+mod lifecycle;
 mod review;
 mod vault;
 
@@ -134,6 +135,35 @@ fn run() -> Result<()> {
                 );
             } else {
                 println!("Compiled config: {}", summary.cache.to_string_lossy());
+            }
+        }
+        Command::Normalize(args) => {
+            match lifecycle::normalize(&cli.vault, &args.target, args.check) {
+                Ok(summary) => {
+                    if cli.json {
+                        println!(
+                            "{{\"ok\":true,\"path\":\"{}\",\"strata\":\"{}\",\"status\":\"{}\"}}",
+                            json_escape(&summary.path),
+                            json_escape(&summary.strata),
+                            json_escape(&summary.status)
+                        );
+                    } else if args.check {
+                        println!("Normalized check passed: {}", summary.path);
+                    } else {
+                        println!("Normalized: {}", summary.path);
+                    }
+                }
+                Err(err) if cli.json && err.to_string().contains("description is required") => {
+                    let abs = absolute_path(&args.target)?;
+                    let rel = rel_path(&abs, &cli.vault)
+                        .unwrap_or_else(|| abs.to_string_lossy().to_string());
+                    println!(
+                        "{{\"ok\":false,\"error\":\"description_required\",\"path\":\"{}\"}}",
+                        json_escape(&rel)
+                    );
+                    return Err(err);
+                }
+                Err(err) => return Err(err),
             }
         }
     }

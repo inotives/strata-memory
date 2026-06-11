@@ -18,6 +18,7 @@ pub(crate) enum Command {
     DbMigrate,
     Init,
     ConfigCompile,
+    Normalize(NormalizeArgs),
 }
 
 #[derive(Debug)]
@@ -32,6 +33,12 @@ pub(crate) struct SearchArgs {
     pub(crate) limit: usize,
     pub(crate) include_archived: bool,
     pub(crate) paths_only: bool,
+}
+
+#[derive(Debug)]
+pub(crate) struct NormalizeArgs {
+    pub(crate) target: PathBuf,
+    pub(crate) check: bool,
 }
 
 pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
@@ -181,6 +188,29 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
             }
             Command::ConfigCompile
         }
+        "normalize" => {
+            let mut target: Option<PathBuf> = None;
+            let mut check = false;
+            while let Some(arg) = iter.next() {
+                match arg.as_str() {
+                    "--target" => {
+                        let value = iter.next().ok_or("--target requires FILE")?;
+                        target = Some(PathBuf::from(value));
+                    }
+                    "--vault" => {
+                        let value = iter.next().ok_or("--vault requires PATH")?;
+                        vault = PathBuf::from(value);
+                    }
+                    "--check" => check = true,
+                    "--json" => json = true,
+                    other => return Err(format!("unknown argument: {other}").into()),
+                }
+            }
+            Command::Normalize(NormalizeArgs {
+                target: target.ok_or("missing --target")?,
+                check,
+            })
+        }
         _ => return Err(format!("unknown command: {command}").into()),
     };
 
@@ -199,6 +229,7 @@ fn print_usage() {
     println!("       strata db-migrate [--vault PATH] [--json]");
     println!("       strata init [--vault PATH] [--json]");
     println!("       strata config-compile [--vault PATH] [--json]");
+    println!("       strata normalize --target FILE [--vault PATH] [--check] [--json]");
 }
 
 fn home_dir() -> PathBuf {
