@@ -11,11 +11,13 @@ pub(crate) struct Cli {
 
 #[derive(Debug)]
 pub(crate) enum Command {
+    AgentsGenerate,
     Index(IndexMode),
     Search(SearchArgs),
     LinkReview,
     DbMigrate,
     Init,
+    ConfigCompile,
 }
 
 #[derive(Debug)]
@@ -46,6 +48,19 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
     let command = iter.next().ok_or("missing command")?;
 
     let parsed_command = match command.as_str() {
+        "agents-generate" => {
+            while let Some(arg) = iter.next() {
+                match arg.as_str() {
+                    "--vault" => {
+                        let value = iter.next().ok_or("--vault requires PATH")?;
+                        vault = PathBuf::from(value);
+                    }
+                    "--json" => json = true,
+                    other => return Err(format!("unknown argument: {other}").into()),
+                }
+            }
+            Command::AgentsGenerate
+        }
         "index" => {
             let mut full = false;
             let mut target: Option<PathBuf> = None;
@@ -153,6 +168,19 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
             }
             Command::Init
         }
+        "config-compile" => {
+            while let Some(arg) = iter.next() {
+                match arg.as_str() {
+                    "--vault" => {
+                        let value = iter.next().ok_or("--vault requires PATH")?;
+                        vault = PathBuf::from(value);
+                    }
+                    "--json" => json = true,
+                    other => return Err(format!("unknown argument: {other}").into()),
+                }
+            }
+            Command::ConfigCompile
+        }
         _ => return Err(format!("unknown command: {command}").into()),
     };
 
@@ -165,10 +193,12 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
 
 fn print_usage() {
     println!("Usage: strata index [--target FILE | --full] [--vault PATH] [--json]");
+    println!("       strata agents-generate [--vault PATH] [--json]");
     println!("       strata search --query TEXT [--vault PATH] [--limit N] [--include-archived] [--paths-only] [--json]");
     println!("       strata link-review [--vault PATH] [--json]");
     println!("       strata db-migrate [--vault PATH] [--json]");
     println!("       strata init [--vault PATH] [--json]");
+    println!("       strata config-compile [--vault PATH] [--json]");
 }
 
 fn home_dir() -> PathBuf {

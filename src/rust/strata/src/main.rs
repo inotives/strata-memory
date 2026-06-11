@@ -1,4 +1,6 @@
+mod agents;
 mod cli;
+mod config;
 mod db;
 mod review;
 mod vault;
@@ -65,6 +67,18 @@ fn run() -> Result<()> {
     let cli = cli::parse_args(env::args().skip(1).collect())?;
 
     match cli.command {
+        Command::AgentsGenerate => {
+            let summary = agents::generate(&cli.vault)?;
+            if cli.json {
+                println!(
+                    "{{\"ok\":true,\"path\":\"{}\",\"profile\":\"{}\"}}",
+                    json_escape(&summary.path),
+                    json_escape(&summary.profile)
+                );
+            } else {
+                println!("Generated AGENTS.md for profile: {}", summary.profile);
+            }
+        }
         Command::Index(mode) => {
             let indexed = index(&cli.vault, mode)?;
             if cli.json {
@@ -106,6 +120,20 @@ fn run() -> Result<()> {
                     "Initialized Strata-Memory vault: {}",
                     cli.vault.to_string_lossy()
                 );
+            }
+        }
+        Command::ConfigCompile => {
+            let summary = config::compile(&cli.vault)?;
+            if cli.json {
+                println!(
+                    "{{\"ok\":true,\"cache\":\"{}\",\"profile\":\"{}\",\"rooms\":{},\"tags\":{}}}",
+                    json_escape(&summary.cache.to_string_lossy()),
+                    json_escape(&summary.profile),
+                    summary.rooms,
+                    summary.tags
+                );
+            } else {
+                println!("Compiled config: {}", summary.cache.to_string_lossy());
             }
         }
     }
