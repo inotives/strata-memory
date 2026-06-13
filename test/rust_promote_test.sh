@@ -74,6 +74,26 @@ assert_contains "$target" 'promoted_at: "'
 assert_contains "$archive" 'status: "archived"'
 assert_contains "$archive" 'archived_from: "1_draft/research/sqlite-fts.md"'
 
+cat > "${VAULT}/1_draft/research/2026-06-07__dated-research.md" <<'EOF'
+---
+title: "Dated Research"
+description: "Promotable dated research draft."
+status: "pending"
+tags:
+  - research
+---
+# Dated Research
+EOF
+
+out=$("$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/2026-06-07__dated-research.md" --to 2_knowledge --json)
+case "$out" in
+    *'"target":"2_knowledge/research/2026-06-07__dated-research.md"'*) ;;
+    *) fail "expected dated research filename to be preserved: $out" ;;
+esac
+assert_file "${VAULT}/2_knowledge/research/2026-06-07__dated-research.md"
+assert_file "${VAULT}/1_draft/_archived/research/2026-06-07__dated-research.md"
+assert_missing "${VAULT}/1_draft/research/2026-06-07__dated-research.md"
+
 DB="${VAULT}/0_core/db/strata.db"
 target_index=$(/usr/bin/sqlite3 "$DB" "SELECT count(*) FROM memory_index WHERE path = '2_knowledge/research/sqlite-fts.md' AND status = 'verified';")
 assert_eq "$target_index" "1" "target indexed"
@@ -112,6 +132,25 @@ assert_file "${VAULT}/1_draft/research/conflict.md"
 "$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/conflict.md" --to 2_knowledge --new-slug duplicate-note >/dev/null
 assert_file "${VAULT}/2_knowledge/research/duplicate-note.md"
 assert_file "${VAULT}/1_draft/_archived/research/conflict.md"
+
+cat > "${VAULT}/1_draft/research/2026-06-08__rename-me.md" <<'EOF'
+---
+title: "Rename Me"
+description: "Promotable dated research draft with a new slug."
+status: "pending"
+tags:
+  - research
+---
+# Rename Me
+EOF
+
+out=$("$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/2026-06-08__rename-me.md" --to 2_knowledge --new-slug renamed-research --json)
+case "$out" in
+    *'"target":"2_knowledge/research/2026-06-08__renamed-research.md"'*) ;;
+    *) fail "expected new slug to preserve research date prefix: $out" ;;
+esac
+assert_file "${VAULT}/2_knowledge/research/2026-06-08__renamed-research.md"
+assert_file "${VAULT}/1_draft/_archived/research/2026-06-08__rename-me.md"
 
 mkdir -p "${VAULT}/1_draft/trading"
 cat > "${VAULT}/1_draft/trading/website-source.md" <<'EOF'

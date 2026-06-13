@@ -284,21 +284,18 @@ pub(crate) fn promote(
         .parent()
         .map(|path| path.to_string_lossy().to_string())
         .unwrap_or_else(|| ".".to_string());
-    let mut draft_base = draft_path
+    let original_draft_base = draft_path
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or("invalid draft filename")?
         .to_string();
+    let target_room = promote_target_room(to, &draft_dir)?;
+    let mut draft_base = original_draft_base.clone();
     if let Some(slug) = new_slug {
         validate_new_slug(slug)?;
-        draft_base = if slug.ends_with(".md") {
-            slug.to_string()
-        } else {
-            format!("{slug}.md")
-        };
+        draft_base = promotion_slug_filename(&original_draft_base, slug, &target_room);
     }
 
-    let target_room = promote_target_room(to, &draft_dir)?;
     let target_strata = target_room
         .split('/')
         .next()
@@ -408,6 +405,38 @@ fn validate_new_slug(slug: &str) -> Result<()> {
         );
     }
     Ok(())
+}
+
+fn promotion_slug_filename(original_base: &str, slug: &str, target_room: &str) -> String {
+    let slug_base = slug.strip_suffix(".md").unwrap_or(slug);
+    let dated_slug =
+        if target_room == "2_knowledge/research" && !has_research_date_prefix(slug_base) {
+            original_base
+                .split_once("__")
+                .filter(|(prefix, _)| is_yyyy_mm_dd(prefix))
+                .map(|(prefix, _)| format!("{prefix}__{slug_base}"))
+                .unwrap_or_else(|| slug_base.to_string())
+        } else {
+            slug_base.to_string()
+        };
+    format!("{dated_slug}.md")
+}
+
+fn has_research_date_prefix(value: &str) -> bool {
+    value
+        .split_once("__")
+        .is_some_and(|(prefix, _)| is_yyyy_mm_dd(prefix))
+}
+
+fn is_yyyy_mm_dd(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() == 10
+        && bytes[4] == b'-'
+        && bytes[7] == b'-'
+        && bytes
+            .iter()
+            .enumerate()
+            .all(|(index, byte)| matches!(index, 4 | 7) || byte.is_ascii_digit())
 }
 
 fn build_promote_candidate(
