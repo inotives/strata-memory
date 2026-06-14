@@ -40,10 +40,13 @@ Research drafts should start from the managed template at `0_core/template/draft
 
 Core commands are namespaced in generated command tables.
 
+Before relying on Strata search results, run `strata refresh` once per session. Re-run it after creating, editing, moving, deleting, promoting, or migrating vault files. Use plain `strata search` for repeated queries after refresh.
+
 | Command | Usage |
 |---|---|
 | `strata:init` | Initialize vault structure and bootstrap config. |
 | `strata:doctor` | Check vault health, dependencies, config, schema, rooms, tags, and generated files. |
+| `strata:refresh` | Refresh the derived SQLite index with a full scan. |
 | `strata:index` | Index target files or run a full scan. |
 | `strata:search` | Search indexed memory. |
 | `strata:link-review` | Review invalid or broken vault links. |

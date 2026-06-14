@@ -10,8 +10,9 @@ The one-off legacy migration helper remains under `0_core/script/migration.sh`.
 | `strata config-compile` | Validate YAML config and write the derived JSON cache. |
 | `strata db-migrate` | Apply SQLite schema migrations into `0_core/db/strata.db`. |
 | `strata normalize` | Normalize constrained Markdown frontmatter for vault files. |
+| `strata refresh` | Refresh the derived SQLite index with a full scan. |
 | `strata index` | Index Markdown files, links, and sections into SQLite. |
-| `strata search` | Search indexed memory with FTS5 ranking and snippets. |
+| `strata search` | Search indexed memory with FTS5 ranking and snippets. Use `--refresh` for a one-shot full refresh before searching. |
 | `strata tag-review` | Report unknown or similar tags. |
 | `strata room-review` | Report files outside registered room patterns. |
 | `strata link-review` | Report invalid and broken Markdown links. |
