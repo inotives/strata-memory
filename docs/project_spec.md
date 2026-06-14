@@ -747,9 +747,9 @@ Validate migrated content, resolve unmapped rooms, fix links/tags, and stabilize
 
 Add an optional Rust `strata` binary behind the existing Bash command contract, starting with bulk indexing and preserving Bash fallback behavior.
 
-### Phase 4: Watchers and Real-Time Sync
+### Phase 4: Search Freshness Policy
 
-Add `watcher/linux.sh` and `watcher/mac.sh` only after migration validation is complete.
+Keep search fast by default while giving humans and agents explicit refresh controls. Add `strata refresh` as the intent-level command for full re-indexing, add `strata search --refresh` for one-shot fresh search, and update generated agent guidance to refresh once per session and after vault file edits.
 
 ### Phase 5: Semantic/Vector Search
 
@@ -758,6 +758,10 @@ Add optional `sqlite-vec` and local embeddings after FTS5 and lifecycle behavior
 ### Phase 6: Workflow Runner and Richer Automation
 
 Add workflow execution orchestration after skills, agents, and reports have stable contracts.
+
+### Phase 7: Optional Watchers and Real-Time Sync
+
+Add Linux and macOS file watchers only if explicit refresh becomes painful. Watchers are deferred infrastructure polish, not the default freshness strategy.
 
 ## 19. MVP Acceptance
 

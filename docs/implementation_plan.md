@@ -179,31 +179,39 @@ Exit criteria:
 
 - Migrated vault has no blocking doctor errors.
 - `_unmapped` has been reviewed or intentionally retained.
-- Watcher work may start only after this phase is accepted.
+- Search freshness work may start only after this phase is accepted.
 
-## Phase 4: Watchers and Real-Time Sync
+## Phase 4: Search Freshness Policy
 
-Goal: automate indexing after external file edits.
+Goal: keep search fast by default while giving humans and agents explicit controls to refresh the derived SQLite index when freshness matters.
 
 Implementation steps:
 
-1. Add watcher design doc based on stable migration/index behavior.
-2. Implement `watcher/linux.sh` first.
-3. Add event debounce and duplicate-event handling.
-4. Use content hash and modified fields to avoid unnecessary re-indexing.
-5. Add post-MVP `watcher/mac.sh` when macOS validation is available.
+1. Add `strata refresh` as a top-level command that runs the same full-index path as `strata index --full`.
+2. Add `strata refresh --json` with output shaped like `{"ok":true,"indexed":N}`.
+3. Add `strata search --refresh` to run a full refresh before executing the search query.
+4. Keep plain `strata search` fast by querying the existing index without implicit re-indexing.
+5. Keep refresh/index progress and status on stderr so stdout remains parseable search output.
+6. For `strata search --refresh --json`, include refresh metadata such as `refreshed: true` and `indexed: N`.
+7. For plain `strata search --json`, include `refreshed: false`.
+8. Improve missing-database search errors to suggest `strata refresh`.
+9. Update generated `AGENTS.md` guidance to run `strata refresh` once per session and again after creating, editing, moving, deleting, promoting, or migrating vault files.
+10. Document that `strata refresh` only updates the derived index and runs existing DB migrations; health and review commands remain separate.
 
 Testing steps:
 
-1. Linux fixture watcher detects creates, edits, moves, and deletes.
-2. Watcher does not index ignored paths.
-3. Watcher handles rapid consecutive writes.
-4. Watcher recovery works after restart.
+1. `strata refresh` indexes an isolated fixture vault and updates stale rows.
+2. `strata refresh --json` emits valid JSON with the indexed count.
+3. `strata search --refresh` returns fresh results after an external file edit.
+4. `strata search --refresh --json` emits one parseable JSON object containing refresh metadata and results.
+5. Plain `strata search` does not run a refresh implicitly.
+6. Missing-database search errors recommend `strata refresh`.
+7. Generated `AGENTS.md` includes the session refresh guidance.
 
 Exit criteria:
 
-- Linux watcher is reliable against migrated vault fixtures.
-- macOS remains deferred until available hardware.
+- Agents and humans have a documented, explicit refresh path before memory lookup.
+- Repeated plain searches remain fast because they do not re-index by default.
 
 ## Phase 5: Semantic and Vector Search
 
@@ -250,3 +258,27 @@ Testing steps:
 Exit criteria:
 
 - Workflows run reproducibly without weakening script execution boundaries.
+
+## Phase 7: Optional Watchers and Real-Time Sync
+
+Goal: automate indexing after external file edits only if explicit refresh proves too manual.
+
+Implementation steps:
+
+1. Add watcher design doc based on stable migration/index behavior and the Phase 4 refresh contract.
+2. Implement Linux watcher support first.
+3. Add event debounce and duplicate-event handling.
+4. Use content hash and modified fields to avoid unnecessary re-indexing.
+5. Add macOS watcher support when macOS validation is available.
+
+Testing steps:
+
+1. Linux fixture watcher detects creates, edits, moves, and deletes.
+2. Watcher does not index ignored paths.
+3. Watcher handles rapid consecutive writes.
+4. Watcher recovery works after restart.
+
+Exit criteria:
+
+- Linux watcher is reliable against migrated vault fixtures.
+- macOS remains deferred until available hardware.
