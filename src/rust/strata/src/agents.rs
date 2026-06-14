@@ -113,10 +113,12 @@ fn generated_block(core: &Path, profile: &str, tier2_rooms: &[String]) -> Result
     out.push('\n');
     out.push_str("## Strata Commands\n\n");
     out.push_str("Core commands are namespaced in generated command tables.\n\n");
+    out.push_str("Before relying on Strata search results, run `strata refresh` once per session. Re-run it after creating, editing, moving, deleting, promoting, or migrating vault files. Use plain `strata search` for repeated queries after refresh.\n\n");
     out.push_str("| Command | Usage |\n");
     out.push_str("|---|---|\n");
     out.push_str("| `strata:init` | Initialize vault structure and bootstrap config. |\n");
     out.push_str("| `strata:doctor` | Check vault health, dependencies, config, schema, rooms, tags, and generated files. |\n");
+    out.push_str("| `strata:refresh` | Refresh the derived SQLite index with a full scan. |\n");
     out.push_str("| `strata:index` | Index target files or run a full scan. |\n");
     out.push_str("| `strata:search` | Search indexed memory. |\n");
     out.push_str("| `strata:promote` | Promote drafts into knowledge or intelligence. |\n");

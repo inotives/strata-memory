@@ -99,7 +99,47 @@ assert_contains "$human" "[alpha]" "snippet"
 
 json=$("$STRATA_BIN" search --vault "$VAULT" --query alpha --json --limit 1)
 assert_contains "$json" '"ok":true' "json ok"
+assert_contains "$json" '"refreshed":false' "json not refreshed"
 assert_contains "$json" '"results":[' "json results"
 assert_contains "$json" '"path":"2_knowledge/concept/alpha-title.md"' "json path"
+
+cat > "${VAULT}/2_knowledge/concept/fresh.md" <<'EOF'
+---
+title: "Fresh"
+description: "Freshness policy test."
+strata: "2_knowledge"
+status: "verified"
+tags:
+  - search
+sources:
+  - "../../1_draft/_archived/research/fresh.md"
+version: 1
+---
+# Fresh
+
+omega fresh content
+EOF
+
+stale_results=$("$STRATA_BIN" search --vault "$VAULT" --query omega --paths-only --limit 10 || true)
+case "$stale_results" in
+    *"2_knowledge/concept/fresh.md"*) fail "plain search should not refresh implicitly" ;;
+esac
+
+refreshed=$("$STRATA_BIN" search --vault "$VAULT" --query omega --refresh --paths-only --limit 10)
+assert_contains "$refreshed" "2_knowledge/concept/fresh.md" "refresh search indexes new file"
+
+refresh_json=$("$STRATA_BIN" search --vault "$VAULT" --query omega --refresh --json --limit 1)
+assert_contains "$refresh_json" '"refreshed":true' "refresh json metadata"
+assert_contains "$refresh_json" '"indexed":' "refresh json indexed count"
+assert_contains "$refresh_json" '"path":"2_knowledge/concept/fresh.md"' "refresh json path"
+
+refresh_cmd_json=$("$STRATA_BIN" refresh --vault "$VAULT" --json)
+assert_contains "$refresh_cmd_json" '"ok":true' "refresh command json ok"
+assert_contains "$refresh_cmd_json" '"indexed":' "refresh command indexed count"
+
+MISSING_VAULT=$(mktemp -d "${TMP_ROOT}/rust-search-missing-db-XXXXXXXX")
+"${ROOT}/install.sh" --vault "$MISSING_VAULT" >/dev/null
+missing_out=$("$STRATA_BIN" search --vault "$MISSING_VAULT" --query alpha 2>&1 || true)
+assert_contains "$missing_out" "run strata refresh first" "missing db guidance"
 
 printf 'ok - rust search passed\n'

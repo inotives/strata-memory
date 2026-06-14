@@ -50,6 +50,8 @@ assert_contains "${VAULT}/AGENTS.md" '0_core/template/draft/research-draft.md'
 assert_contains "${VAULT}/AGENTS.md" 'Profile: `coder`'
 assert_contains "${VAULT}/AGENTS.md" '- `entity/project/*`'
 assert_contains "${VAULT}/AGENTS.md" '- `entity/tool/*`'
+assert_contains "${VAULT}/AGENTS.md" 'run `strata refresh` once per session'
+assert_contains "${VAULT}/AGENTS.md" '| `strata:refresh` | Refresh the derived SQLite index with a full scan. |'
 assert_contains "${VAULT}/AGENTS.md" '| `strata:link-review` | Review invalid or broken vault links. |'
 assert_contains "${VAULT}/AGENTS.md" 'keep this manual instruction'
 assert_count "${VAULT}/AGENTS.md" '<!-- STRATA_GENERATED_START -->' 1

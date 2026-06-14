@@ -89,6 +89,14 @@ fn run() -> Result<()> {
                 println!("Indexed {indexed} file(s)");
             }
         }
+        Command::Refresh => {
+            let indexed = index(&cli.vault, IndexMode::Full)?;
+            if cli.json {
+                println!("{{\"ok\":true,\"indexed\":{indexed}}}");
+            } else {
+                println!("Refreshed index: {indexed} file(s)");
+            }
+        }
         Command::Search(search_args) => {
             search(&cli.vault, &search_args, cli.json)?;
         }
@@ -249,9 +257,15 @@ fn index(vault: &Path, mode: IndexMode) -> Result<usize> {
 }
 
 fn search(vault: &Path, args: &SearchArgs, json: bool) -> Result<()> {
+    let indexed = if args.refresh {
+        Some(index(vault, IndexMode::Full)?)
+    } else {
+        None
+    };
+
     let db_path = vault.join("0_core/db/strata.db");
     if !db_path.is_file() {
-        return Err("database not found; run strata index first".into());
+        return Err("database not found; run strata refresh first".into());
     }
 
     let conn = Connection::open(db_path)?;
@@ -275,6 +289,25 @@ LIMIT ?2",
         let rows = stmt.query_map(params![args.query, args.limit as i64], |row| {
             row.get::<_, String>(0)
         })?;
+        if json {
+            print!(
+                "{{\"ok\":true,\"query\":\"{}\",\"refreshed\":{},",
+                json_escape(&args.query),
+                args.refresh
+            );
+            if let Some(indexed) = indexed {
+                print!("\"indexed\":{indexed},");
+            }
+            print!("\"results\":[");
+            for (idx, row) in rows.enumerate() {
+                if idx > 0 {
+                    print!(",");
+                }
+                print!("\"{}\"", json_escape(&row?));
+            }
+            println!("]}}");
+            return Ok(());
+        }
         for row in rows {
             println!("{}", row?);
         }
@@ -318,9 +351,14 @@ LIMIT ?2",
 
     if json {
         print!(
-            "{{\"ok\":true,\"query\":\"{}\",\"results\":[",
-            json_escape(&args.query)
+            "{{\"ok\":true,\"query\":\"{}\",\"refreshed\":{},",
+            json_escape(&args.query),
+            args.refresh
         );
+        if let Some(indexed) = indexed {
+            print!("\"indexed\":{indexed},");
+        }
+        print!("\"results\":[");
         for (idx, result) in results.iter().enumerate() {
             if idx > 0 {
                 print!(",");
@@ -358,16 +396,17 @@ struct SearchResult {
 
 fn index_full(conn: &mut Connection, vault: &Path) -> Result<usize> {
     let files = collect_markdown_files(vault)?;
-    let mut seen = HashSet::new();
+    let seen: HashSet<String> = files
+        .iter()
+        .filter_map(|file| rel_path(file, vault))
+        .collect();
     let progress_every = progress_interval();
     let total = files.len();
 
     let tx = conn.transaction()?;
+    remove_stale(&tx, &seen)?;
     let mut indexed = 0;
     for (idx, file) in files.iter().enumerate() {
-        if let Some(rel) = rel_path(file, vault) {
-            seen.insert(rel);
-        }
         indexed += index_one(&tx, vault, file)?;
         if progress_every > 0 {
             let current = idx + 1;

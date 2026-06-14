@@ -13,6 +13,7 @@ pub(crate) struct Cli {
 pub(crate) enum Command {
     AgentsGenerate,
     Index(IndexMode),
+    Refresh,
     Search(SearchArgs),
     LinkReview,
     PrivacyReview,
@@ -39,6 +40,7 @@ pub(crate) struct SearchArgs {
     pub(crate) limit: usize,
     pub(crate) include_archived: bool,
     pub(crate) paths_only: bool,
+    pub(crate) refresh: bool,
 }
 
 #[derive(Debug)]
@@ -114,11 +116,25 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
             };
             Command::Index(mode)
         }
+        "refresh" => {
+            while let Some(arg) = iter.next() {
+                match arg.as_str() {
+                    "--vault" => {
+                        let value = iter.next().ok_or("--vault requires PATH")?;
+                        vault = PathBuf::from(value);
+                    }
+                    "--json" => json = true,
+                    other => return Err(format!("unknown argument: {other}").into()),
+                }
+            }
+            Command::Refresh
+        }
         "search" => {
             let mut query: Option<String> = None;
             let mut limit = 10;
             let mut include_archived = false;
             let mut paths_only = false;
+            let mut refresh = false;
 
             while let Some(arg) = iter.next() {
                 match arg.as_str() {
@@ -137,6 +153,7 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
                     }
                     "--include-archived" => include_archived = true,
                     "--paths-only" => paths_only = true,
+                    "--refresh" => refresh = true,
                     "--json" => json = true,
                     other if query.is_none() => query = Some(other.to_string()),
                     other => return Err(format!("unknown argument: {other}").into()),
@@ -152,6 +169,7 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
                 limit,
                 include_archived,
                 paths_only,
+                refresh,
             })
         }
         "link-review" => {
@@ -338,8 +356,9 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
 
 fn print_usage() {
     println!("Usage: strata index [--target FILE | --full] [--vault PATH] [--json]");
+    println!("       strata refresh [--vault PATH] [--json]");
     println!("       strata agents-generate [--vault PATH] [--json]");
-    println!("       strata search --query TEXT [--vault PATH] [--limit N] [--include-archived] [--paths-only] [--json]");
+    println!("       strata search --query TEXT [--vault PATH] [--limit N] [--include-archived] [--paths-only] [--refresh] [--json]");
     println!("       strata link-review [--vault PATH] [--json]");
     println!("       strata privacy-review [--vault PATH] [--json]");
     println!("       strata tag-review [--vault PATH] [--json]");

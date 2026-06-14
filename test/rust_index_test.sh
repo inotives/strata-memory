@@ -105,4 +105,25 @@ rm "${VAULT}/1_draft/research/raw.md"
 stale_count=$(/usr/bin/sqlite3 "$DB" "SELECT count(*) FROM memory_index WHERE path = '1_draft/research/raw.md';")
 assert_eq "$stale_count" "0" "stale removal"
 
+cat > "${VAULT}/1_draft/research/moved.md" <<'EOF'
+---
+id: "moved-note"
+title: "Moved Note"
+description: ""
+tags:
+  - research
+---
+# Moved
+
+Moved note content.
+EOF
+"$STRATA_BIN" index --vault "$VAULT" --full >/dev/null
+mkdir -p "${VAULT}/1_draft/note"
+mv "${VAULT}/1_draft/research/moved.md" "${VAULT}/1_draft/note/moved.md"
+"$STRATA_BIN" index --vault "$VAULT" --full >/dev/null
+moved_count=$(/usr/bin/sqlite3 "$DB" "SELECT count(*) FROM memory_index WHERE id = 'moved-note' AND path = '1_draft/note/moved.md';")
+assert_eq "$moved_count" "1" "moved file id reindex"
+old_moved_count=$(/usr/bin/sqlite3 "$DB" "SELECT count(*) FROM memory_index WHERE path = '1_draft/research/moved.md';")
+assert_eq "$old_moved_count" "0" "moved file stale path removed"
+
 printf 'ok - rust index passed\n'
