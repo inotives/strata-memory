@@ -100,6 +100,9 @@ fn run() -> Result<()> {
         Command::Search(search_args) => {
             search(&cli.vault, &search_args, cli.json)?;
         }
+        Command::SemanticStatus => {
+            semantic_status(&cli.vault, cli.json)?;
+        }
         Command::LinkReview => {
             review::link_review(&cli.vault, cli.json)?;
         }
@@ -262,6 +265,16 @@ fn search(vault: &Path, args: &SearchArgs, json: bool) -> Result<()> {
     } else {
         None
     };
+    let requested_mode = if args.hybrid { "hybrid" } else { "fts" };
+    let mode = "fts";
+    let mut warnings = Vec::new();
+    if args.hybrid {
+        let warning = "semantic search unavailable; returned FTS5 results".to_string();
+        if !json {
+            eprintln!("strata search: warning: {warning}");
+        }
+        warnings.push(warning);
+    }
 
     let db_path = vault.join("0_core/db/strata.db");
     if !db_path.is_file() {
@@ -291,10 +304,14 @@ LIMIT ?2",
         })?;
         if json {
             print!(
-                "{{\"ok\":true,\"query\":\"{}\",\"refreshed\":{},",
+                "{{\"ok\":true,\"query\":\"{}\",\"refreshed\":{},\"requested_mode\":\"{}\",\"mode\":\"{}\",\"warnings\":",
                 json_escape(&args.query),
-                args.refresh
+                args.refresh,
+                requested_mode,
+                mode
             );
+            print_json_string_array(&warnings);
+            print!(",");
             if let Some(indexed) = indexed {
                 print!("\"indexed\":{indexed},");
             }
@@ -351,10 +368,14 @@ LIMIT ?2",
 
     if json {
         print!(
-            "{{\"ok\":true,\"query\":\"{}\",\"refreshed\":{},",
+            "{{\"ok\":true,\"query\":\"{}\",\"refreshed\":{},\"requested_mode\":\"{}\",\"mode\":\"{}\",\"warnings\":",
             json_escape(&args.query),
-            args.refresh
+            args.refresh,
+            requested_mode,
+            mode
         );
+        print_json_string_array(&warnings);
+        print!(",");
         if let Some(indexed) = indexed {
             print!("\"indexed\":{indexed},");
         }
@@ -380,6 +401,58 @@ LIMIT ?2",
                 result.path, result.title, result.status, result.rank, result.snippet
             );
         }
+    }
+
+    Ok(())
+}
+
+fn semantic_status(vault: &Path, json: bool) -> Result<()> {
+    db::migrate(vault)?;
+    let semantic = config::semantic(vault)?;
+    let provider_configured =
+        !semantic.provider.is_empty() && !semantic.model.is_empty() && semantic.embedding_dim > 0;
+    let db_path = vault.join("0_core/db/strata.db");
+    let conn = Connection::open(db_path)?;
+    let embedding_count = table_row_count(&conn, "semantic_embeddings")?;
+    let model_count = table_row_count(&conn, "semantic_models")?;
+    let vector_index_ready = embedding_count > 0;
+    let vector_extension_available = false;
+    let semantic_available =
+        provider_configured && vector_index_ready && vector_extension_available;
+    let fallback = "fts5";
+
+    if json {
+        println!(
+            "{{\"ok\":true,\"semantic_available\":{},\"provider_configured\":{},\"vector_index_ready\":{},\"vector_extension_available\":{},\"fallback\":\"{}\",\"provider\":\"{}\",\"model\":\"{}\",\"embedding_dim\":{},\"embedding_count\":{},\"model_count\":{}}}",
+            semantic_available,
+            provider_configured,
+            vector_index_ready,
+            vector_extension_available,
+            fallback,
+            json_escape(&semantic.provider),
+            json_escape(&semantic.model),
+            semantic.embedding_dim,
+            embedding_count,
+            model_count
+        );
+    } else {
+        println!(
+            "Semantic search: {}",
+            if semantic_available {
+                "available"
+            } else {
+                "unavailable"
+            }
+        );
+        println!(
+            "Provider configured: {}",
+            if provider_configured { "yes" } else { "no" }
+        );
+        println!(
+            "Vector index ready: {}",
+            if vector_index_ready { "yes" } else { "no" }
+        );
+        println!("Fallback: FTS5");
     }
 
     Ok(())
@@ -703,6 +776,31 @@ fn json_escape(value: &str) -> String {
         }
     }
     out
+}
+
+fn print_json_string_array(values: &[String]) {
+    print!("[");
+    for (idx, value) in values.iter().enumerate() {
+        if idx > 0 {
+            print!(",");
+        }
+        print!("\"{}\"", json_escape(value));
+    }
+    print!("]");
+}
+
+fn table_row_count(conn: &Connection, table: &str) -> Result<i64> {
+    let exists: i64 = conn.query_row(
+        "SELECT count(*) FROM sqlite_master WHERE type IN ('table','virtual table') AND name = ?1",
+        params![table],
+        |row| row.get(0),
+    )?;
+    if exists == 0 {
+        return Ok(0);
+    }
+
+    let sql = format!("SELECT count(*) FROM {table}");
+    Ok(conn.query_row(&sql, [], |row| row.get(0))?)
 }
 
 fn extract_links(content: &str) -> Vec<Link> {

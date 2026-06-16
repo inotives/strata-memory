@@ -28,7 +28,7 @@ if [ ! -x "$SQLITE_BIN" ]; then
 fi
 
 tables=$("$SQLITE_BIN" "$DB" "SELECT name FROM sqlite_master WHERE type IN ('table','virtual table') ORDER BY name;")
-for table in links memory_index schema_migrations sections; do
+for table in links memory_index schema_migrations sections semantic_embeddings semantic_models; do
     case "$tables" in
         *"$table"*) ;;
         *) printf 'not ok - expected table %s\n%s\n' "$table" "$tables" >&2; exit 1 ;;
@@ -40,6 +40,9 @@ migration_count=$("$SQLITE_BIN" "$DB" "SELECT count(*) FROM schema_migrations WH
 
 fts_count=$("$SQLITE_BIN" "$DB" "SELECT count(*) FROM schema_migrations WHERE version = '002';")
 [ "$fts_count" = "1" ] || fail "expected FTS5 migration to be recorded"
+
+semantic_count=$("$SQLITE_BIN" "$DB" "SELECT count(*) FROM schema_migrations WHERE version = '003';")
+[ "$semantic_count" = "1" ] || fail "expected semantic foundation migration to be recorded"
 
 second=$("$STRATA_BIN" db-migrate --vault "$VAULT" --json 2>/dev/null)
 case "$second" in

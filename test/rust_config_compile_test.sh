@@ -27,6 +27,8 @@ CACHE="${VAULT}/0_core/cache/config.compiled.json"
 [ -f "$CACHE" ] || fail "expected cache file"
 
 [ "$(jq -r '.profile' "$CACHE")" = "coder" ] || fail "expected coder profile"
+[ "$(jq -r '.semantic.provider' "$CACHE")" = "" ] || fail "expected empty semantic provider"
+[ "$(jq -r '.semantic.model' "$CACHE")" = "" ] || fail "expected empty semantic model"
 [ "$(jq -r '.rooms[] | select(.pattern == "2_knowledge/entity/project/*") | .depth' "$CACHE")" = "recursive" ] || fail "expected project room"
 [ "$(jq -r '.profiles.coder.tier2_rooms[] | select(. == "entity/tool/*")' "$CACHE")" = "entity/tool/*" ] || fail "expected coder tool room"
 

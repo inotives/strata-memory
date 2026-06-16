@@ -10,6 +10,8 @@ use std::path::{Path, PathBuf};
 struct Config {
     profile: String,
     retention: Retention,
+    #[serde(default)]
+    semantic: Semantic,
     tags: Tags,
     rooms: BTreeMap<String, Vec<RoomConfig>>,
     profiles: BTreeMap<String, Profile>,
@@ -19,6 +21,16 @@ struct Config {
 struct Retention {
     archived_drafts_days: i64,
     default_mode: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub(crate) struct Semantic {
+    #[serde(default)]
+    pub(crate) provider: String,
+    #[serde(default)]
+    pub(crate) model: String,
+    #[serde(default)]
+    pub(crate) embedding_dim: i64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -94,6 +106,10 @@ pub(crate) fn allowed_tags(vault: &Path) -> Result<Vec<String>> {
     let mut tags = read_config(vault)?.tags.allowed;
     tags.sort();
     Ok(tags)
+}
+
+pub(crate) fn semantic(vault: &Path) -> Result<Semantic> {
+    Ok(read_config(vault)?.semantic)
 }
 
 pub(crate) fn room_patterns(vault: &Path) -> Result<Vec<String>> {
@@ -172,6 +188,7 @@ pub(crate) fn compile(vault: &Path) -> Result<CompileSummary> {
         "source": "0_core/config/configs.yaml",
         "profile": profile,
         "retention": config.retention,
+        "semantic": config.semantic,
         "tags": {"allowed": tags},
         "rooms": rooms,
         "profiles": config.profiles,

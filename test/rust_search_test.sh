@@ -100,8 +100,22 @@ assert_contains "$human" "[alpha]" "snippet"
 json=$("$STRATA_BIN" search --vault "$VAULT" --query alpha --json --limit 1)
 assert_contains "$json" '"ok":true' "json ok"
 assert_contains "$json" '"refreshed":false' "json not refreshed"
+assert_contains "$json" '"requested_mode":"fts"' "json requested fts"
+assert_contains "$json" '"mode":"fts"' "json mode fts"
+assert_contains "$json" '"warnings":[]' "json no warnings"
 assert_contains "$json" '"results":[' "json results"
 assert_contains "$json" '"path":"2_knowledge/concept/alpha-title.md"' "json path"
+
+hybrid_err="${VAULT}/0_core/tmp/hybrid.err"
+hybrid=$("$STRATA_BIN" search --vault "$VAULT" --query alpha --hybrid --limit 1 2>"$hybrid_err")
+assert_contains "$hybrid" "2_knowledge/concept/alpha-title.md" "hybrid fallback results"
+assert_contains "$(cat "$hybrid_err")" "semantic search unavailable; returned FTS5 results" "hybrid warning"
+
+hybrid_json=$("$STRATA_BIN" search --vault "$VAULT" --query alpha --hybrid --json --limit 1)
+assert_contains "$hybrid_json" '"requested_mode":"hybrid"' "hybrid json requested mode"
+assert_contains "$hybrid_json" '"mode":"fts"' "hybrid json actual mode"
+assert_contains "$hybrid_json" '"warnings":["semantic search unavailable; returned FTS5 results"]' "hybrid json warning"
+assert_contains "$hybrid_json" '"path":"2_knowledge/concept/alpha-title.md"' "hybrid json result"
 
 cat > "${VAULT}/2_knowledge/concept/fresh.md" <<'EOF'
 ---
@@ -130,6 +144,8 @@ assert_contains "$refreshed" "2_knowledge/concept/fresh.md" "refresh search inde
 
 refresh_json=$("$STRATA_BIN" search --vault "$VAULT" --query omega --refresh --json --limit 1)
 assert_contains "$refresh_json" '"refreshed":true' "refresh json metadata"
+assert_contains "$refresh_json" '"requested_mode":"fts"' "refresh json requested mode"
+assert_contains "$refresh_json" '"mode":"fts"' "refresh json actual mode"
 assert_contains "$refresh_json" '"indexed":' "refresh json indexed count"
 assert_contains "$refresh_json" '"path":"2_knowledge/concept/fresh.md"' "refresh json path"
 

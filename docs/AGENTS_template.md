@@ -149,6 +149,7 @@ Before relying on Strata search results, run `strata refresh` once per session. 
 | `strata:refresh` | Refresh the derived SQLite index with a full scan. |
 | `strata:index` | Index target files or run a full scan. |
 | `strata:search` | Search indexed memory. |
+| `strata:semantic-status` | Report semantic search readiness and fallback mode. |
 | `strata:link-review` | Review invalid or broken vault links. |
 | `strata:promote` | Promote drafts into knowledge or intelligence. |
 | `strata:tag-review` | Review unknown or similar tags. |
