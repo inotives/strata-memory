@@ -215,26 +215,76 @@ Exit criteria:
 
 ## Phase 5: Semantic and Vector Search
 
-Goal: add optional semantic retrieval after lifecycle/search correctness is stable.
+Goal: add optional local semantic retrieval after lifecycle/search correctness is stable, without weakening FTS5 reliability or the local-first privacy model.
+
+Design decisions:
+
+1. Semantic search is optional; FTS5 search must continue working when semantic dependencies are missing.
+2. The first implementation is local-only. Do not send vault content to hosted/API embedding providers.
+3. Store semantic metadata in `0_core/db/strata.db` so the derived search index remains inspectable and rebuildable.
+4. Embed frontmatter descriptions and Markdown sections first; do not start with whole-file embeddings.
+5. Plain `strata search` remains FTS5-only by default.
+6. `strata search --hybrid` is opt-in.
+7. If hybrid search is requested but semantic search is unavailable, return FTS5 results with an explicit warning.
+8. JSON output includes requested mode, actual mode, and warnings.
+9. Use `strata semantic-status` as the user-facing status command.
+10. Split implementation into a foundation PR and a provider PR.
+
+### Phase 5 PR 1: Semantic Search Foundation
 
 Implementation steps:
 
-1. Choose embedding install path and model management.
-2. Add optional `sqlite-vec` support.
-3. Add embedding table keyed by content hash.
-4. Start with description embeddings.
-5. Later add section/body chunk embeddings.
-6. Add hybrid FTS/vector search mode.
+1. Add schema migrations for semantic metadata and vector index readiness.
+2. Track provider, model, embedding dimension, path, section identity, and content hash.
+3. Add config fields for semantic search provider/model without requiring them.
+4. Add `strata semantic-status` with human and JSON output.
+5. Add `strata search --hybrid`.
+6. Keep hybrid fallback on FTS5 when no provider, no semantic index, or no vector extension is available.
+7. Print human fallback warnings to stderr.
+8. Include JSON fields such as `requested_mode`, `mode`, and `warnings`.
+9. Do not generate embeddings in this PR.
+
+Testing steps:
+
+1. Missing semantic config reports semantic search unavailable while FTS5 remains available.
+2. `strata semantic-status --json` reports provider configuration, vector index readiness, and fallback mode.
+3. Plain `strata search` remains FTS5-only.
+4. `strata search --hybrid` falls back to FTS5 with a human warning when semantic search is unavailable.
+5. `strata search --hybrid --json` returns parseable JSON with requested mode, actual mode, warnings, and normal FTS results.
+6. Existing search filters, archived exclusion, `--paths-only`, `--limit`, `--refresh`, and `--json` continue to work.
+
+Exit criteria:
+
+- The semantic search product contract is represented in schema, config, CLI, docs, and tests.
+- No embedding runtime is required for the CLI or existing tests to pass.
+- FTS5 behavior is unchanged unless `--hybrid` is explicitly requested.
+
+### Phase 5 PR 2: First Local Embedding Provider
+
+Implementation steps:
+
+1. Choose the simplest local embedding runtime after PR 1 is accepted.
+2. Add an embedding refresh command.
+3. Embed non-empty frontmatter descriptions.
+4. Embed Markdown sections from the existing `sections` table.
+5. Key embeddings by content hash and model identity so stale vectors can be rebuilt.
+6. Add optional vector nearest-neighbor search, such as `sqlite-vec`, when available.
+7. Combine FTS and vector scores for hybrid ranking.
+8. Keep vectors local and rebuildable from Markdown.
 
 Testing steps:
 
 1. Missing vector dependencies degrade cleanly to FTS.
 2. Embeddings are invalidated by content hash changes.
 3. Hybrid search preserves metadata/status filters.
+4. Empty descriptions are skipped.
+5. Archived content remains excluded by default.
+6. Live validation runs against a temporary or approved real-vault copy.
 
 Exit criteria:
 
 - Vector search is optional and cannot break core FTS workflows.
+- Hybrid search improves natural-language discovery without weakening exact FTS matches.
 
 ## Phase 6: Workflow Runner and Richer Automation
 

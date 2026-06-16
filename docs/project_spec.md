@@ -753,7 +753,26 @@ Keep search fast by default while giving humans and agents explicit refresh cont
 
 ### Phase 5: Semantic/Vector Search
 
-Add optional `sqlite-vec` and local embeddings after FTS5 and lifecycle behavior are stable.
+Add optional local semantic retrieval after FTS5 and lifecycle behavior are stable. Plain `strata search` remains FTS5-only by default. Semantic search is opt-in through hybrid mode and must degrade explicitly to FTS5 when semantic dependencies or indexes are unavailable.
+
+Phase 5 is split into two implementation PRs:
+
+1. Semantic search foundation:
+   - Keep semantic search optional; FTS5 remains the reliable default.
+   - Preserve the local-first privacy model; do not use hosted/API embeddings in the first implementation.
+   - Store semantic metadata in `0_core/db/strata.db`.
+   - Add schema for provider/model metadata and vector index readiness keyed by path, section, content hash, model, and embedding dimension.
+   - Add `strata semantic-status`.
+   - Add `strata search --hybrid`.
+   - Fall back to FTS5 with an explicit warning when semantic search is requested but unavailable.
+   - Include requested mode, actual mode, and warnings in JSON output.
+2. First local embedding provider:
+   - Choose the simplest local embedding runtime after the foundation contract is stable.
+   - Add an embedding refresh command.
+   - Embed frontmatter descriptions and Markdown sections first; skip empty descriptions.
+   - Store vectors locally and make them rebuildable from Markdown.
+   - Combine FTS and vector signals for hybrid ranking.
+   - Keep archived content excluded by default, matching FTS search behavior.
 
 ### Phase 6: Workflow Runner and Richer Automation
 
