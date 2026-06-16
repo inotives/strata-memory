@@ -13,6 +13,7 @@ The one-off legacy migration helper remains under `0_core/script/migration.sh`.
 | `strata refresh` | Refresh the derived SQLite index with a full scan. |
 | `strata index` | Index Markdown files, links, and sections into SQLite. |
 | `strata search` | Search indexed memory with FTS5 ranking and snippets. Use `--refresh` for a one-shot full refresh before searching and `--hybrid` to request semantic search with explicit FTS5 fallback. |
+| `strata semantic-refresh` | Rebuild local semantic embeddings from indexed descriptions and Markdown sections when a local provider is configured. |
 | `strata semantic-status` | Report semantic search provider configuration, vector index readiness, and fallback mode. |
 | `strata tag-review` | Report unknown or similar tags. |
 | `strata room-review` | Report files outside registered room patterns. |
