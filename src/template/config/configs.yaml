@@ -4,6 +4,11 @@ retention:
   archived_drafts_days: 180
   default_mode: "report"
 
+semantic:
+  provider: ""
+  model: ""
+  embedding_dim: 0
+
 tags:
   allowed:
     - agent

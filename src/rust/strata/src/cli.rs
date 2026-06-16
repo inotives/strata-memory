@@ -15,6 +15,7 @@ pub(crate) enum Command {
     Index(IndexMode),
     Refresh,
     Search(SearchArgs),
+    SemanticStatus,
     LinkReview,
     PrivacyReview,
     TagReview,
@@ -41,6 +42,7 @@ pub(crate) struct SearchArgs {
     pub(crate) include_archived: bool,
     pub(crate) paths_only: bool,
     pub(crate) refresh: bool,
+    pub(crate) hybrid: bool,
 }
 
 #[derive(Debug)]
@@ -135,6 +137,7 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
             let mut include_archived = false;
             let mut paths_only = false;
             let mut refresh = false;
+            let mut hybrid = false;
 
             while let Some(arg) = iter.next() {
                 match arg.as_str() {
@@ -154,6 +157,7 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
                     "--include-archived" => include_archived = true,
                     "--paths-only" => paths_only = true,
                     "--refresh" => refresh = true,
+                    "--hybrid" => hybrid = true,
                     "--json" => json = true,
                     other if query.is_none() => query = Some(other.to_string()),
                     other => return Err(format!("unknown argument: {other}").into()),
@@ -170,7 +174,21 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
                 include_archived,
                 paths_only,
                 refresh,
+                hybrid,
             })
+        }
+        "semantic-status" => {
+            while let Some(arg) = iter.next() {
+                match arg.as_str() {
+                    "--vault" => {
+                        let value = iter.next().ok_or("--vault requires PATH")?;
+                        vault = PathBuf::from(value);
+                    }
+                    "--json" => json = true,
+                    other => return Err(format!("unknown argument: {other}").into()),
+                }
+            }
+            Command::SemanticStatus
         }
         "link-review" => {
             while let Some(arg) = iter.next() {
@@ -358,7 +376,8 @@ fn print_usage() {
     println!("Usage: strata index [--target FILE | --full] [--vault PATH] [--json]");
     println!("       strata refresh [--vault PATH] [--json]");
     println!("       strata agents-generate [--vault PATH] [--json]");
-    println!("       strata search --query TEXT [--vault PATH] [--limit N] [--include-archived] [--paths-only] [--refresh] [--json]");
+    println!("       strata search --query TEXT [--vault PATH] [--limit N] [--include-archived] [--paths-only] [--refresh] [--hybrid] [--json]");
+    println!("       strata semantic-status [--vault PATH] [--json]");
     println!("       strata link-review [--vault PATH] [--json]");
     println!("       strata privacy-review [--vault PATH] [--json]");
     println!("       strata tag-review [--vault PATH] [--json]");

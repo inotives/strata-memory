@@ -121,6 +121,9 @@ fn generated_block(core: &Path, profile: &str, tier2_rooms: &[String]) -> Result
     out.push_str("| `strata:refresh` | Refresh the derived SQLite index with a full scan. |\n");
     out.push_str("| `strata:index` | Index target files or run a full scan. |\n");
     out.push_str("| `strata:search` | Search indexed memory. |\n");
+    out.push_str(
+        "| `strata:semantic-status` | Report semantic search readiness and fallback mode. |\n",
+    );
     out.push_str("| `strata:promote` | Promote drafts into knowledge or intelligence. |\n");
     out.push_str("| `strata:tag-review` | Review unknown or similar tags. |\n");
     out.push_str("| `strata:room-review` | Review unregistered rooms. |\n");
