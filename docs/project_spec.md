@@ -767,11 +767,11 @@ Phase 5 is split into two implementation PRs:
    - Fall back to FTS5 with an explicit warning when semantic search is requested but unavailable.
    - Include requested mode, actual mode, and warnings in JSON output.
 2. First local embedding provider:
-   - Choose the simplest local embedding runtime after the foundation contract is stable.
-   - Add an embedding refresh command.
+   - Use the built-in local hash embedding runtime first (`builtin-hash` / `hash-v1`) so semantic search has no hosted API, model download, or daemon requirement.
+   - Add `strata semantic-refresh` as the embedding refresh command.
    - Embed frontmatter descriptions and Markdown sections first; skip empty descriptions.
    - Store vectors locally and make them rebuildable from Markdown.
-   - Combine FTS and vector signals for hybrid ranking.
+   - Combine FTS and local vector signals for hybrid ranking.
    - Keep archived content excluded by default, matching FTS search behavior.
 
 ### Phase 6: Workflow Runner and Richer Automation

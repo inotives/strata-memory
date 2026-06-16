@@ -122,6 +122,9 @@ fn generated_block(core: &Path, profile: &str, tier2_rooms: &[String]) -> Result
     out.push_str("| `strata:index` | Index target files or run a full scan. |\n");
     out.push_str("| `strata:search` | Search indexed memory. |\n");
     out.push_str(
+        "| `strata:semantic-refresh` | Rebuild local semantic embeddings when configured. |\n",
+    );
+    out.push_str(
         "| `strata:semantic-status` | Report semantic search readiness and fallback mode. |\n",
     );
     out.push_str("| `strata:promote` | Promote drafts into knowledge or intelligence. |\n");

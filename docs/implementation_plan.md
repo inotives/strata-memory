@@ -263,12 +263,12 @@ Exit criteria:
 
 Implementation steps:
 
-1. Choose the simplest local embedding runtime after PR 1 is accepted.
-2. Add an embedding refresh command.
+1. Use the built-in local hash embedding runtime first (`builtin-hash` / `hash-v1`) so the feature has no hosted API, model download, or external daemon requirement.
+2. Add `strata semantic-refresh` as the embedding refresh command.
 3. Embed non-empty frontmatter descriptions.
 4. Embed Markdown sections from the existing `sections` table.
 5. Key embeddings by content hash and model identity so stale vectors can be rebuilt.
-6. Add optional vector nearest-neighbor search, such as `sqlite-vec`, when available.
+6. Add local vector nearest-neighbor search in the CLI; keep external vector extensions such as `sqlite-vec` optional future improvements.
 7. Combine FTS and vector scores for hybrid ranking.
 8. Keep vectors local and rebuildable from Markdown.
 

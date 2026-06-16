@@ -15,6 +15,7 @@ pub(crate) enum Command {
     Index(IndexMode),
     Refresh,
     Search(SearchArgs),
+    SemanticRefresh,
     SemanticStatus,
     LinkReview,
     PrivacyReview,
@@ -189,6 +190,19 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
                 }
             }
             Command::SemanticStatus
+        }
+        "semantic-refresh" => {
+            while let Some(arg) = iter.next() {
+                match arg.as_str() {
+                    "--vault" => {
+                        let value = iter.next().ok_or("--vault requires PATH")?;
+                        vault = PathBuf::from(value);
+                    }
+                    "--json" => json = true,
+                    other => return Err(format!("unknown argument: {other}").into()),
+                }
+            }
+            Command::SemanticRefresh
         }
         "link-review" => {
             while let Some(arg) = iter.next() {
@@ -377,6 +391,7 @@ fn print_usage() {
     println!("       strata refresh [--vault PATH] [--json]");
     println!("       strata agents-generate [--vault PATH] [--json]");
     println!("       strata search --query TEXT [--vault PATH] [--limit N] [--include-archived] [--paths-only] [--refresh] [--hybrid] [--json]");
+    println!("       strata semantic-refresh [--vault PATH] [--json]");
     println!("       strata semantic-status [--vault PATH] [--json]");
     println!("       strata link-review [--vault PATH] [--json]");
     println!("       strata privacy-review [--vault PATH] [--json]");
