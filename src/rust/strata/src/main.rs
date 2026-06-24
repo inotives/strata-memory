@@ -108,8 +108,9 @@ fn run() -> Result<()> {
             let summary = index::migrate(&cli.vault)?;
             if cli.json {
                 println!(
-                    "{{\"ok\":true,\"backend\":\"{}\",\"db\":\"{}\",\"applied\":{}}}",
+                    "{{\"ok\":true,\"backend\":\"{}\",\"experimental\":{},\"db\":\"{}\",\"applied\":{}}}",
                     summary.backend,
+                    summary.experimental,
                     json_escape(&summary.db_path.to_string_lossy()),
                     summary.applied
                 );

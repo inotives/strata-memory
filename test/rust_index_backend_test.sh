@@ -26,8 +26,20 @@ sed 's/backend: "sqlite"/backend: "turso"/' \
     "${VAULT}/0_core/config/configs.yaml" > "${VAULT}/0_core/config/configs.yaml.turso"
 mv "${VAULT}/0_core/config/configs.yaml.turso" "${VAULT}/0_core/config/configs.yaml"
 
+TURSO_MIGRATE=$("$STRATA_BIN" db-migrate --vault "$VAULT" --json)
+case "$TURSO_MIGRATE" in
+    *'"backend":"turso"'*'"experimental":true'*'"applied":2'*) ;;
+    *) fail "expected Turso migrations: $TURSO_MIGRATE" ;;
+esac
+[ -f "${VAULT}/0_core/db/strata-turso.db" ] || fail "expected Turso database file"
+
+TURSO_SECOND=$("$STRATA_BIN" db-migrate --vault "$VAULT" --json)
+case "$TURSO_SECOND" in
+    *'"backend":"turso"'*'"applied":0'*) ;;
+    *) fail "expected idempotent Turso migrations: $TURSO_SECOND" ;;
+esac
+
 for command in \
-    "db-migrate" \
     "refresh" \
     "search --query test" \
     "semantic-refresh" \

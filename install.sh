@@ -65,7 +65,8 @@ create_vault_dirs() {
     for rel in \
         "0_core/config" \
         "0_core/cache" \
-        "0_core/db/migrations" \
+        "0_core/db/sqlite/migrations" \
+        "0_core/db/turso/migrations" \
         "0_core/doc" \
         "0_core/script/lib" \
         "0_core/template" \

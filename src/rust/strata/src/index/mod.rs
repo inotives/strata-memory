@@ -2,7 +2,7 @@ pub(crate) mod model;
 mod sqlite;
 mod turso;
 
-pub(crate) use sqlite::posix_cksum;
+pub(crate) use model::posix_cksum;
 
 use crate::cli::{IndexMode, SearchArgs};
 use crate::config;
@@ -14,6 +14,7 @@ pub(crate) struct ActiveIndex {
     pub(crate) backend: IndexBackend,
     pub(crate) db_path: PathBuf,
     pub(crate) applied: usize,
+    pub(crate) experimental: bool,
 }
 
 pub(crate) struct IndexInfo {
@@ -43,6 +44,7 @@ pub(crate) fn active(vault: &Path) -> Result<ActiveIndex> {
             backend: IndexBackend::Sqlite,
             db_path: sqlite::database_path(vault),
             applied: 0,
+            experimental: false,
         }),
         IndexBackend::Turso => turso::unavailable(),
     }
@@ -54,8 +56,14 @@ pub(crate) fn migrate(vault: &Path) -> Result<ActiveIndex> {
             backend: IndexBackend::Sqlite,
             db_path: sqlite::database_path(vault),
             applied: sqlite::migrate(vault)?,
+            experimental: false,
         }),
-        IndexBackend::Turso => turso::unavailable(),
+        IndexBackend::Turso => Ok(ActiveIndex {
+            backend: IndexBackend::Turso,
+            db_path: turso::database_path(vault),
+            applied: turso::migrate(vault)?,
+            experimental: true,
+        }),
     }
 }
 
