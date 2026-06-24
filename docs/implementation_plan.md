@@ -286,7 +286,39 @@ Exit criteria:
 - Vector search is optional and cannot break core FTS workflows.
 - Hybrid search improves natural-language discovery without weakening exact FTS matches.
 
-## Phase 6: Workflow Runner and Richer Automation
+## Phase 6: Apple Silicon macOS and Turso Index Backend Evaluation
+
+Goal: support local installation on Apple Silicon macOS and determine whether embedded local Turso can eventually replace SQLite without changing the production default.
+
+Reference: `docs/phase-6-macos-turso-evaluation.md`
+
+Implementation steps:
+
+1. Add Apple Silicon detection, local release build, installation, and smoke validation to the existing installer.
+2. Add vault-wide `index.backend: sqlite|turso`, defaulting to `sqlite`.
+3. Keep separate rebuildable database files for SQLite and Turso.
+4. Preserve the current SQLite/rusqlite backend.
+5. Implement Turso as an opt-in complete backend for migrations, indexing, FTS, semantic vectors, hybrid search, status, and doctor checks.
+6. Use Turso exact vector distance functions; do not build a custom ANN index.
+7. Run cross-backend correctness, stability, size, and latency comparisons on Linux and Apple Silicon macOS.
+8. Publish an evaluation report without changing the default backend.
+
+Testing steps:
+
+1. Existing vaults remain on SQLite when `index.backend` is absent.
+2. Every index-related command uses the configured backend consistently.
+3. Both backends pass the same CLI contract tests.
+4. Backend switching requires `strata refresh` and never converts or silently falls back.
+5. Apple Silicon installation and the normal acceptance flow pass.
+6. Turso meets or fails the documented replacement-candidate gates with recorded evidence.
+
+Exit criteria:
+
+- Apple Silicon macOS is a supported local-build platform.
+- Turso is a complete opt-in backend with measured parity and reliability results.
+- SQLite remains the default and available fallback.
+
+## Phase 7: Workflow Runner and Richer Automation
 
 Goal: execute workflow definitions with dependency checks and report generation.
 
@@ -309,7 +341,7 @@ Exit criteria:
 
 - Workflows run reproducibly without weakening script execution boundaries.
 
-## Phase 7: Optional Watchers and Real-Time Sync
+## Phase 8: Optional Watchers and Real-Time Sync
 
 Goal: automate indexing after external file edits only if explicit refresh proves too manual.
 
@@ -319,7 +351,7 @@ Implementation steps:
 2. Implement Linux watcher support first.
 3. Add event debounce and duplicate-event handling.
 4. Use content hash and modified fields to avoid unnecessary re-indexing.
-5. Add macOS watcher support when macOS validation is available.
+5. Add Apple Silicon macOS watcher support when justified by refresh usage.
 
 Testing steps:
 
@@ -331,4 +363,4 @@ Testing steps:
 Exit criteria:
 
 - Linux watcher is reliable against migrated vault fixtures.
-- macOS remains deferred until available hardware.
+- Watchers remain optional on both supported platforms.

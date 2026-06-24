@@ -774,13 +774,17 @@ Phase 5 is split into two implementation PRs:
    - Combine FTS and local vector signals for hybrid ranking.
    - Keep archived content excluded by default, matching FTS search behavior.
 
-### Phase 6: Workflow Runner and Richer Automation
+### Phase 6: Apple Silicon macOS and Turso Index Backend Evaluation
+
+Support local builds and installation on Apple Silicon macOS. Add `index.backend: sqlite|turso`, keeping SQLite/rusqlite as the default and embedded local Turso as an opt-in complete backend using a separate rebuildable database. Evaluate Turso full-text behavior, exact vector search, correctness, stability, and performance before any later replacement decision.
+
+### Phase 7: Workflow Runner and Richer Automation
 
 Add workflow execution orchestration after skills, agents, and reports have stable contracts.
 
-### Phase 7: Optional Watchers and Real-Time Sync
+### Phase 8: Optional Watchers and Real-Time Sync
 
-Add Linux and macOS file watchers only if explicit refresh becomes painful. Watchers are deferred infrastructure polish, not the default freshness strategy.
+Add Linux and Apple Silicon macOS file watchers only if explicit refresh becomes painful. Watchers are deferred infrastructure polish, not the default freshness strategy.
 
 ## 19. MVP Acceptance
 
@@ -797,4 +801,4 @@ Linux-only acceptance for MVP:
 9. Run `strata doctor` successfully.
 10. Run section migration from `~/.agent-knowledge/memory` without modifying old memory.
 
-macOS support remains a design constraint and post-MVP validation target.
+Apple Silicon macOS support is delivered in Phase 6. Intel macOS remains outside the supported target set.

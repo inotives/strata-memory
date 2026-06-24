@@ -1,0 +1,3 @@
+# Define gates for considering Turso as a SQLite replacement
+
+Turso is a viable replacement candidate only if it has no user-visible correctness regressions against SQLite, full refresh takes no more than twice SQLite's elapsed time, median FTS and hybrid query latency is no more than twice SQLite's, its index file is no larger than twice SQLite's, and repeated rebuilds show no crashes or database corruption. Results must be measured on representative temporary vault copies on Linux and Apple Silicon macOS; passing these gates permits a later default-backend decision but does not change the default in this phase.
