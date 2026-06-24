@@ -95,6 +95,35 @@ create_vault_dirs() {
     done
 }
 
+build_strata() {
+    local os arch
+    os=$(uname -s)
+    arch=$(uname -m)
+
+    case "${os}/${arch}" in
+        Linux/*|Darwin/arm64) ;;
+        Darwin/*)
+            printf '%s\n' "Unsupported platform: ${os}/${arch}. macOS requires Apple Silicon (arm64)." >&2
+            exit 1
+            ;;
+        *)
+            printf '%s\n' "Unsupported platform: ${os}/${arch}. Supported platforms are Linux and Apple Silicon macOS." >&2
+            exit 1
+            ;;
+    esac
+
+    if ! command -v cargo >/dev/null 2>&1; then
+        printf '%s\n' "Missing prerequisite: cargo. Install Rust and Cargo, then rerun install.sh." >&2
+        exit 1
+    fi
+
+    local cargo_args=(build --release --manifest-path "${SRC_DIR}/rust/strata/Cargo.toml")
+    if [ "${STRATA_CARGO_OFFLINE:-0}" = 1 ]; then
+        cargo_args+=(--offline)
+    fi
+    cargo "${cargo_args[@]}"
+}
+
 write_manifest() {
     local manifest="${CORE}/manifest.json"
     local now
@@ -122,6 +151,7 @@ write_manifest() {
 
 mkdir -p "$CORE"
 create_vault_dirs
+build_strata
 
 copy_tree "${SRC_DIR}/script" "${CORE}/script"
 copy_tree "${SRC_DIR}/db" "${CORE}/db"
@@ -129,9 +159,7 @@ copy_tree "${SRC_DIR}/doc" "${CORE}/doc"
 copy_tree "${SRC_DIR}/template" "${CORE}/template"
 
 mkdir -p "${CORE}/bin"
-if [ -x "${SRC_DIR}/rust/strata/target/release/strata" ]; then
-    cp "${SRC_DIR}/rust/strata/target/release/strata" "${CORE}/bin/strata"
-fi
+cp "${SRC_DIR}/rust/strata/target/release/strata" "${CORE}/bin/strata"
 
 if [ ! -f "${CORE}/config/configs.yaml" ]; then
     cp "${SRC_DIR}/template/config/configs.yaml" "${CORE}/config/configs.yaml"
