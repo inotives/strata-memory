@@ -1,4 +1,4 @@
-use crate::{absolute_path, collect_markdown_files_rec, json_escape, rel_path, Result};
+use crate::{absolute_path, collect_markdown_files_rec, config, json_escape, rel_path, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -17,6 +17,7 @@ pub(crate) enum IndexBackend {
 pub(crate) struct IndexSummary {
     pub(crate) backend: IndexBackend,
     pub(crate) indexed: usize,
+    pub(crate) experimental: bool,
 }
 
 pub(crate) struct SemanticRefreshSummary {
@@ -27,6 +28,25 @@ pub(crate) struct SemanticRefreshSummary {
     pub(crate) indexed: usize,
     pub(crate) descriptions: usize,
     pub(crate) sections: usize,
+}
+
+#[derive(Debug)]
+pub(crate) struct SearchResult {
+    pub(crate) path: String,
+    pub(crate) title: String,
+    pub(crate) status: String,
+    pub(crate) rank: String,
+    pub(crate) snippet: String,
+}
+
+pub(crate) struct SemanticCandidate {
+    pub(crate) path: String,
+    pub(crate) title: String,
+    pub(crate) status: String,
+    pub(crate) target_type: String,
+    pub(crate) section_start_line: Option<i64>,
+    pub(crate) text: String,
+    pub(crate) score: f32,
 }
 
 impl fmt::Display for IndexBackend {
@@ -432,3 +452,89 @@ const POSIX_CRC_TABLE: [u32; 256] = [
     0x89b8fd09, 0x8d79e0be, 0x803ac667, 0x84fbdbd0, 0x9abc8bd5, 0x9e7d9662, 0x933eb0bb, 0x97ffad0c,
     0xafb010b1, 0xab710d06, 0xa6322bdf, 0xa2f33668, 0xbcb4666d, 0xb8757bda, 0xb5365d03, 0xb1f740b4,
 ];
+
+pub(crate) fn builtin_embedding_supported(semantic: &config::Semantic) -> bool {
+    semantic.provider == "builtin-hash" && semantic.model == "hash-v1" && semantic.embedding_dim > 0
+}
+
+pub(crate) fn validate_builtin_embedding_config(semantic: &config::Semantic) -> Result<()> {
+    if semantic.provider.is_empty() && semantic.model.is_empty() && semantic.embedding_dim == 0 {
+        return Err("semantic provider not configured; set provider builtin-hash, model hash-v1, and embedding_dim > 0".into());
+    }
+    if !builtin_embedding_supported(semantic) {
+        return Err(format!(
+            "unsupported semantic provider/model: {}/{}; supported local provider is builtin-hash/hash-v1",
+            semantic.provider, semantic.model
+        )
+        .into());
+    }
+    Ok(())
+}
+
+pub(crate) fn embed_text(text: &str, dim: usize) -> Vec<f32> {
+    let dim = dim.max(1);
+    let mut vector = vec![0.0f32; dim];
+    for token in semantic_tokens(text) {
+        let hash = fnv1a64(token.as_bytes());
+        let idx = (hash as usize) % dim;
+        vector[idx] += 1.0;
+    }
+    normalize_vector(&mut vector);
+    vector
+}
+
+pub(crate) fn semantic_tokens(text: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    for ch in text.chars() {
+        if ch.is_ascii_alphanumeric() {
+            current.push(ch.to_ascii_lowercase());
+        } else if !current.is_empty() {
+            tokens.push(std::mem::take(&mut current));
+        }
+    }
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+    tokens
+}
+
+pub(crate) fn normalize_vector(vector: &mut [f32]) {
+    let magnitude = vector.iter().map(|value| value * value).sum::<f32>().sqrt();
+    if magnitude <= f32::EPSILON {
+        return;
+    }
+    for value in vector {
+        *value /= magnitude;
+    }
+}
+
+pub(crate) fn cosine_similarity(left: &[f32], right: &[f32]) -> f32 {
+    left.iter()
+        .zip(right.iter())
+        .map(|(left, right)| left * right)
+        .sum()
+}
+
+pub(crate) fn encode_vector(vector: &[f32]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(vector.len() * 4);
+    for value in vector {
+        out.extend_from_slice(&value.to_le_bytes());
+    }
+    out
+}
+
+pub(crate) fn decode_vector(blob: &[u8]) -> Vec<f32> {
+    blob.chunks_exact(4)
+        .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+        .collect()
+}
+
+pub(crate) fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in bytes {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
+}

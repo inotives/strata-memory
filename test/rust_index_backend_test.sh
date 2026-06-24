@@ -28,7 +28,7 @@ mv "${VAULT}/0_core/config/configs.yaml.turso" "${VAULT}/0_core/config/configs.y
 
 TURSO_MIGRATE=$("$STRATA_BIN" db-migrate --vault "$VAULT" --json)
 case "$TURSO_MIGRATE" in
-    *'"backend":"turso"'*'"experimental":true'*'"applied":2'*) ;;
+    *'"backend":"turso"'*'"experimental":true'*'"applied":3'*) ;;
     *) fail "expected Turso migrations: $TURSO_MIGRATE" ;;
 esac
 [ -f "${VAULT}/0_core/db/strata-turso.db" ] || fail "expected Turso database file"
@@ -39,24 +39,57 @@ case "$TURSO_SECOND" in
     *) fail "expected idempotent Turso migrations: $TURSO_SECOND" ;;
 esac
 
-for command in \
-    "refresh" \
-    "search --query test" \
-    "semantic-refresh" \
-    "semantic-status"
-do
-    if "$STRATA_BIN" $command --vault "$VAULT" >/dev/null 2>"${VAULT}/0_core/tmp/backend.err"; then
-        fail "expected Turso rejection for: $command"
-    fi
-    grep -F 'index backend turso is not available yet; set index.backend: sqlite and run strata refresh' \
-        "${VAULT}/0_core/tmp/backend.err" >/dev/null 2>&1 || fail "expected explicit Turso error for: $command"
-done
+cat > "${VAULT}/2_knowledge/concept/turso-search.md" <<'EOF'
+---
+title: "Turso Search"
+description: "Embedded vector search evaluation."
+status: "verified"
+---
+# Turso Search
 
-if doctor=$("$STRATA_BIN" doctor --vault "$VAULT" --json 2>/dev/null); then
-    fail "expected doctor to reject unavailable Turso backend"
-fi
+Exact local semantic retrieval.
+EOF
+
+refresh=$("$STRATA_BIN" refresh --vault "$VAULT" --json)
+case "$refresh" in
+    *'"backend":"turso"'*'"indexed":'*) ;;
+    *) fail "expected Turso refresh: $refresh" ;;
+esac
+
+search=$("$STRATA_BIN" search --vault "$VAULT" --query "vector search" --json)
+case "$search" in
+    *'"backend":"turso"'*'"mode":"fts"'*'2_knowledge/concept/turso-search.md'*) ;;
+    *) fail "expected Turso FTS result: $search" ;;
+esac
+
+sed \
+    -e 's/provider: ""/provider: "builtin-hash"/' \
+    -e 's/model: ""/model: "hash-v1"/' \
+    -e 's/embedding_dim: 0/embedding_dim: 64/' \
+    "${VAULT}/0_core/config/configs.yaml" > "${VAULT}/0_core/config/configs.yaml.semantic"
+mv "${VAULT}/0_core/config/configs.yaml.semantic" "${VAULT}/0_core/config/configs.yaml"
+
+semantic=$("$STRATA_BIN" semantic-refresh --vault "$VAULT" --json)
+case "$semantic" in
+    *'"backend":"turso"'*'"indexed":'*) ;;
+    *) fail "expected Turso semantic refresh: $semantic" ;;
+esac
+
+status=$("$STRATA_BIN" semantic-status --vault "$VAULT" --json)
+case "$status" in
+    *'"backend":"turso"'*'"experimental":true'*'"semantic_available":true'*) ;;
+    *) fail "expected Turso semantic status: $status" ;;
+esac
+
+hybrid=$("$STRATA_BIN" search --vault "$VAULT" --query "local semantic retrieval" --hybrid --json)
+case "$hybrid" in
+    *'"backend":"turso"'*'"mode":"hybrid"'*'2_knowledge/concept/turso-search.md'*) ;;
+    *) fail "expected Turso hybrid result: $hybrid" ;;
+esac
+
+doctor=$("$STRATA_BIN" doctor --vault "$VAULT" --json)
 case "$doctor" in
-    *'"backend":"turso"'*'"experimental":true'*'"name":"index_backend"'*) ;;
+    *'"ok":true'*'"backend":"turso"'*'"experimental":true'*'"name":"index_backend"'*) ;;
     *) fail "expected experimental Turso doctor output: $doctor" ;;
 esac
 

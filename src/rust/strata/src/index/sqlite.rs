@@ -1,7 +1,9 @@
 use crate::cli::{IndexMode, SearchArgs};
 use crate::index;
 use crate::index::model::{
-    collect_markdown_files, posix_cksum_hash, read_document, IndexBackend, SemanticRefreshSummary,
+    builtin_embedding_supported, collect_markdown_files, cosine_similarity, decode_vector,
+    embed_text, encode_vector, posix_cksum_hash, read_document, validate_builtin_embedding_config,
+    IndexBackend, SearchResult, SemanticCandidate, SemanticRefreshSummary,
 };
 use crate::{config, json_escape, rel_path, Result};
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
@@ -294,26 +296,6 @@ pub(super) fn semantic_status(vault: &Path, json: bool) -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug)]
-struct SearchResult {
-    path: String,
-    title: String,
-    status: String,
-    rank: String,
-    snippet: String,
-}
-
-#[derive(Debug)]
-struct SemanticCandidate {
-    path: String,
-    title: String,
-    status: String,
-    target_type: String,
-    section_start_line: Option<i64>,
-    text: String,
-    score: f32,
-}
-
 pub(super) fn semantic_refresh(vault: &Path) -> Result<SemanticRefreshSummary> {
     let active = index::migrate(vault)?;
     let semantic = config::semantic(vault)?;
@@ -520,24 +502,6 @@ fn semantic_search_available(vault: &Path, conn: &Connection) -> Result<bool> {
     Ok(table_row_count(conn, "semantic_embeddings")? > 0)
 }
 
-fn builtin_embedding_supported(semantic: &config::Semantic) -> bool {
-    semantic.provider == "builtin-hash" && semantic.model == "hash-v1" && semantic.embedding_dim > 0
-}
-
-fn validate_builtin_embedding_config(semantic: &config::Semantic) -> Result<()> {
-    if semantic.provider.is_empty() && semantic.model.is_empty() && semantic.embedding_dim == 0 {
-        return Err("semantic provider not configured; set provider builtin-hash, model hash-v1, and embedding_dim > 0".into());
-    }
-    if !builtin_embedding_supported(semantic) {
-        return Err(format!(
-            "unsupported semantic provider/model: {}/{}; supported local provider is builtin-hash/hash-v1",
-            semantic.provider, semantic.model
-        )
-        .into());
-    }
-    Ok(())
-}
-
 fn insert_embedding(
     tx: &Transaction<'_>,
     semantic: &config::Semantic,
@@ -702,74 +666,6 @@ fn semantic_snippet(candidate: &SemanticCandidate) -> String {
     } else {
         format!("{prefix}{trimmed}")
     }
-}
-
-fn embed_text(text: &str, dim: usize) -> Vec<f32> {
-    let dim = dim.max(1);
-    let mut vector = vec![0.0f32; dim];
-    for token in semantic_tokens(text) {
-        let hash = fnv1a64(token.as_bytes());
-        let idx = (hash as usize) % dim;
-        vector[idx] += 1.0;
-    }
-    normalize_vector(&mut vector);
-    vector
-}
-
-fn semantic_tokens(text: &str) -> Vec<String> {
-    let mut tokens = Vec::new();
-    let mut current = String::new();
-    for ch in text.chars() {
-        if ch.is_ascii_alphanumeric() {
-            current.push(ch.to_ascii_lowercase());
-        } else if !current.is_empty() {
-            tokens.push(std::mem::take(&mut current));
-        }
-    }
-    if !current.is_empty() {
-        tokens.push(current);
-    }
-    tokens
-}
-
-fn normalize_vector(vector: &mut [f32]) {
-    let magnitude = vector.iter().map(|value| value * value).sum::<f32>().sqrt();
-    if magnitude <= f32::EPSILON {
-        return;
-    }
-    for value in vector {
-        *value /= magnitude;
-    }
-}
-
-fn cosine_similarity(left: &[f32], right: &[f32]) -> f32 {
-    left.iter()
-        .zip(right.iter())
-        .map(|(left, right)| left * right)
-        .sum()
-}
-
-fn encode_vector(vector: &[f32]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(vector.len() * 4);
-    for value in vector {
-        out.extend_from_slice(&value.to_le_bytes());
-    }
-    out
-}
-
-fn decode_vector(blob: &[u8]) -> Vec<f32> {
-    blob.chunks_exact(4)
-        .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
-        .collect()
-}
-
-fn fnv1a64(bytes: &[u8]) -> u64 {
-    let mut hash = 0xcbf29ce484222325u64;
-    for byte in bytes {
-        hash ^= *byte as u64;
-        hash = hash.wrapping_mul(0x100000001b3);
-    }
-    hash
 }
 
 fn index_full(conn: &mut Connection, vault: &Path) -> Result<usize> {

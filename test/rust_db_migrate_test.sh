@@ -55,7 +55,7 @@ sed 's/backend: "sqlite"/backend: "turso"/' \
 mv "${VAULT}/0_core/config/configs.yaml.turso" "${VAULT}/0_core/config/configs.yaml"
 turso=$("$STRATA_BIN" db-migrate --vault "$VAULT" --json)
 case "$turso" in
-    *'"backend":"turso"'*'"experimental":true'*'"applied":2'*) ;;
+    *'"backend":"turso"'*'"experimental":true'*'"applied":3'*) ;;
     *) fail "expected Turso migration output: $turso" ;;
 esac
 [ -f "${VAULT}/0_core/db/strata-turso.db" ] || fail "expected Turso database file"

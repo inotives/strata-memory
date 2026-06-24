@@ -45,8 +45,8 @@ fn run() -> Result<()> {
             let summary = index::refresh(&cli.vault, mode)?;
             if cli.json {
                 println!(
-                    "{{\"ok\":true,\"backend\":\"{}\",\"indexed\":{}}}",
-                    summary.backend, summary.indexed
+                    "{{\"ok\":true,\"backend\":\"{}\",\"experimental\":{},\"indexed\":{}}}",
+                    summary.backend, summary.experimental, summary.indexed
                 );
             } else {
                 println!("Indexed {} file(s)", summary.indexed);
@@ -56,8 +56,8 @@ fn run() -> Result<()> {
             let summary = index::refresh(&cli.vault, IndexMode::Full)?;
             if cli.json {
                 println!(
-                    "{{\"ok\":true,\"backend\":\"{}\",\"indexed\":{}}}",
-                    summary.backend, summary.indexed
+                    "{{\"ok\":true,\"backend\":\"{}\",\"experimental\":{},\"indexed\":{}}}",
+                    summary.backend, summary.experimental, summary.indexed
                 );
             } else {
                 println!("Refreshed index: {} file(s)", summary.indexed);

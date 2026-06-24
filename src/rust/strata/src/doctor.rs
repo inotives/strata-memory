@@ -190,11 +190,64 @@ fn record_database(vault: &Path, checks: &mut Vec<Check>) {
             return;
         }
     };
-    if info.backend == IndexBackend::Turso {
-        checks.push(error(
-            "index_backend",
-            "index backend turso is experimental and not available yet; set index.backend: sqlite and run strata refresh",
+    let inactive = match info.backend {
+        IndexBackend::Sqlite => vault.join("0_core/db/strata-turso.db"),
+        IndexBackend::Turso => vault.join("0_core/db/strata.db"),
+    };
+    if let Ok(metadata) = fs::metadata(&inactive) {
+        checks.push(pass(
+            "inactive_database",
+            &format!(
+                "{} retained ({} bytes)",
+                inactive
+                    .strip_prefix(vault)
+                    .unwrap_or(&inactive)
+                    .to_string_lossy(),
+                metadata.len()
+            ),
         ));
+    }
+    if info.backend == IndexBackend::Turso {
+        checks.push(warn(
+            "index_backend",
+            "active index backend is experimental Turso",
+        ));
+        let db_path = info.db_path;
+        if !db_path.is_file() {
+            checks.push(error(
+                "database",
+                "0_core/db/strata-turso.db is missing; run strata db-migrate",
+            ));
+            return;
+        }
+        checks.push(pass("database", "0_core/db/strata-turso.db exists"));
+        match index::turso_migrations(vault) {
+            Ok(versions) => {
+                checks.push(pass("schema", "Turso schema_migrations is readable"));
+                for version in ["001", "002", "003"] {
+                    if versions.iter().any(|applied| applied == version) {
+                        checks.push(pass(
+                            match version {
+                                "001" => "migration_001",
+                                "002" => "migration_002",
+                                _ => "migration_003",
+                            },
+                            &format!("Turso migration {version} is applied"),
+                        ));
+                    } else {
+                        checks.push(error(
+                            match version {
+                                "001" => "migration_001",
+                                "002" => "migration_002",
+                                _ => "migration_003",
+                            },
+                            &format!("Turso migration {version} is not applied"),
+                        ));
+                    }
+                }
+            }
+            Err(err) => checks.push(error("schema", &err.to_string())),
+        }
         return;
     }
 

@@ -110,7 +110,9 @@ index:
   backend: sqlite
 ```
 
-Existing configs without `index.backend` continue to use SQLite. `turso` is reserved for the experimental backend and currently returns an explicit unavailable-backend error; it never falls back to SQLite.
+Existing configs without `index.backend` continue to use SQLite. To evaluate the embedded local Turso backend, set `backend: turso`, then run `strata refresh`. Turso uses the separate rebuildable file `0_core/db/strata-turso.db` and is marked experimental in migration, refresh, semantic status, and doctor output. Backend failures never fall back to SQLite.
+
+The Turso evaluation path supports full and target indexing, native Turso FTS, exact `vector_distance_cos` semantic retrieval, hybrid search, and backend-specific migrations. It does not use Turso Cloud, synchronization, or a custom approximate vector index.
 
 The installer:
 
