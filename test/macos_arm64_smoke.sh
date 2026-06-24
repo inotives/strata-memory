@@ -11,6 +11,7 @@ fi
 for test_script in \
     install_test.sh \
     rust_init_test.sh \
+    rust_index_backend_test.sh \
     rust_index_test.sh \
     rust_search_test.sh \
     rust_semantic_refresh_test.sh \

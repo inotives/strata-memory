@@ -27,6 +27,7 @@ CACHE="${VAULT}/0_core/cache/config.compiled.json"
 [ -f "$CACHE" ] || fail "expected cache file"
 
 [ "$(jq -r '.profile' "$CACHE")" = "coder" ] || fail "expected coder profile"
+[ "$(jq -r '.index.backend' "$CACHE")" = "sqlite" ] || fail "expected sqlite index backend"
 [ "$(jq -r '.semantic.provider' "$CACHE")" = "" ] || fail "expected empty semantic provider"
 [ "$(jq -r '.semantic.model' "$CACHE")" = "" ] || fail "expected empty semantic model"
 [ "$(jq -r '.rooms[] | select(.pattern == "2_knowledge/entity/project/*") | .depth' "$CACHE")" = "recursive" ] || fail "expected project room"
@@ -40,5 +41,19 @@ if "$STRATA_BIN" config-compile --vault "$VAULT" >/dev/null 2>"${VAULT}/0_core/t
 fi
 
 grep -F 'tags.allowed values must be lowercase tokens' "${VAULT}/0_core/tmp/config-compile.err" >/dev/null 2>&1 || fail "expected lowercase validation error"
+
+cp "${VAULT}/0_core/config/configs.yaml.bak" "${VAULT}/0_core/config/configs.yaml"
+sed '/^index:/,+1d' "${VAULT}/0_core/config/configs.yaml" > "${VAULT}/0_core/config/configs.yaml.legacy"
+mv "${VAULT}/0_core/config/configs.yaml.legacy" "${VAULT}/0_core/config/configs.yaml"
+"$STRATA_BIN" config-compile --vault "$VAULT" >/dev/null
+[ "$(jq -r '.index.backend' "$CACHE")" = "sqlite" ] || fail "expected legacy config to default to sqlite"
+
+cp "${VAULT}/0_core/config/configs.yaml.bak" "${VAULT}/0_core/config/configs.yaml"
+sed 's/backend: "sqlite"/backend: "invalid"/' "${VAULT}/0_core/config/configs.yaml" > "${VAULT}/0_core/config/configs.yaml.invalid"
+mv "${VAULT}/0_core/config/configs.yaml.invalid" "${VAULT}/0_core/config/configs.yaml"
+if "$STRATA_BIN" config-compile --vault "$VAULT" >/dev/null 2>"${VAULT}/0_core/tmp/config-compile.err"; then
+    fail "expected invalid index backend failure"
+fi
+grep -F 'unknown variant `invalid`, expected `sqlite` or `turso`' "${VAULT}/0_core/tmp/config-compile.err" >/dev/null 2>&1 || fail "expected index backend validation error"
 
 printf 'ok - rust config compile passed\n'

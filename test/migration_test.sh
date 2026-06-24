@@ -224,11 +224,11 @@ assert_file "$ALL_VAULT/3_intelligence/agent/legacy-agents.md"
 COLLIDE="${WORK}/old-collide"
 COLLIDE_VAULT="${WORK}/vault-collide"
 mkdir -p "$COLLIDE/2_knowledges/Concepts"
-cat > "$COLLIDE/2_knowledges/Concepts/AAPL.md" <<'EOF'
-# AAPL
+cat > "$COLLIDE/2_knowledges/Concepts/AAPL!.md" <<'EOF'
+# AAPL!
 EOF
-cat > "$COLLIDE/2_knowledges/Concepts/aapl.md" <<'EOF'
-# aapl
+cat > "$COLLIDE/2_knowledges/Concepts/AAPL@.md" <<'EOF'
+# AAPL@
 EOF
 "${ROOT}/install.sh" --vault "$COLLIDE_VAULT" >/dev/null
 if "${COLLIDE_VAULT}/0_core/script/migration.sh" --from "$COLLIDE" --to "$COLLIDE_VAULT" --section knowledge >/dev/null 2>&1; then

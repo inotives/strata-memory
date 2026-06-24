@@ -1,5 +1,6 @@
+use crate::index::model::IndexBackend;
 use crate::{
-    absolute_path, collect_markdown_files_rec, config, json_escape, rel_path, review, Result,
+    absolute_path, collect_markdown_files_rec, config, index, json_escape, rel_path, review, Result,
 };
 use rusqlite::{params, Connection, OptionalExtension};
 use std::fs::{self, OpenOptions};
@@ -32,6 +33,7 @@ struct Check {
 
 pub(crate) fn run(vault: &Path, json: bool) -> Result<()> {
     let mut checks = Vec::new();
+    let index_info = index::configured(vault).ok();
     fs::create_dir_all(vault.join("0_core/tmp"))?;
 
     record_dependencies(&mut checks);
@@ -52,9 +54,19 @@ pub(crate) fn run(vault: &Path, json: bool) -> Result<()> {
         .count();
 
     if json {
+        let backend = index_info
+            .as_ref()
+            .map(|info| info.backend.to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+        let experimental = index_info
+            .as_ref()
+            .map(|info| info.experimental)
+            .unwrap_or(false);
         print!(
-            "{{\"ok\":{},\"passes\":{},\"warnings\":{},\"errors\":{},\"checks\":[",
+            "{{\"ok\":{},\"backend\":\"{}\",\"experimental\":{},\"passes\":{},\"warnings\":{},\"errors\":{},\"checks\":[",
             if errors == 0 { "true" } else { "false" },
+            backend,
+            experimental,
             passes,
             warnings,
             errors
@@ -171,7 +183,23 @@ fn record_config(vault: &Path, checks: &mut Vec<Check>) {
 }
 
 fn record_database(vault: &Path, checks: &mut Vec<Check>) {
-    let db_path = vault.join("0_core/db/strata.db");
+    let info = match index::configured(vault) {
+        Ok(info) => info,
+        Err(err) => {
+            checks.push(error("index_backend", &err.to_string()));
+            return;
+        }
+    };
+    if info.backend == IndexBackend::Turso {
+        checks.push(error(
+            "index_backend",
+            "index backend turso is experimental and not available yet; set index.backend: sqlite and run strata refresh",
+        ));
+        return;
+    }
+
+    checks.push(pass("index_backend", "active index backend is sqlite"));
+    let db_path = info.db_path;
     if !db_path.is_file() {
         checks.push(error(
             "database",

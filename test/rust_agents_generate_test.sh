@@ -59,7 +59,9 @@ assert_contains "${VAULT}/AGENTS.md" 'keep this manual instruction'
 assert_count "${VAULT}/AGENTS.md" '<!-- STRATA_GENERATED_START -->' 1
 assert_count "${VAULT}/AGENTS.md" '<!-- STRATA_MANUAL_START -->' 1
 
-sed -i 's/profile: "coder"/profile: "trader"/' "${VAULT}/0_core/config/configs.yaml"
+sed 's/profile: "coder"/profile: "trader"/' \
+    "${VAULT}/0_core/config/configs.yaml" > "${VAULT}/0_core/config/configs.yaml.trader"
+mv "${VAULT}/0_core/config/configs.yaml.trader" "${VAULT}/0_core/config/configs.yaml"
 json=$("$STRATA_BIN" agents-generate --vault "$VAULT" --json)
 case "$json" in
     *'"profile":"trader"'*) ;;

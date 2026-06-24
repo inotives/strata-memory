@@ -46,8 +46,17 @@ semantic_count=$("$SQLITE_BIN" "$DB" "SELECT count(*) FROM schema_migrations WHE
 
 second=$("$STRATA_BIN" db-migrate --vault "$VAULT" --json 2>/dev/null)
 case "$second" in
-    *'"ok":true'*'"applied":0'*) ;;
+    *'"ok":true'*'"backend":"sqlite"'*'"applied":0'*) ;;
     *) printf 'not ok - expected idempotent migration\n%s\n' "$second" >&2; exit 1 ;;
 esac
+
+sed 's/backend: "sqlite"/backend: "turso"/' \
+    "${VAULT}/0_core/config/configs.yaml" > "${VAULT}/0_core/config/configs.yaml.turso"
+mv "${VAULT}/0_core/config/configs.yaml.turso" "${VAULT}/0_core/config/configs.yaml"
+if "$STRATA_BIN" db-migrate --vault "$VAULT" >/dev/null 2>"${VAULT}/0_core/tmp/turso.err"; then
+    fail "expected unavailable Turso backend failure"
+fi
+grep -F 'index backend turso is not available yet; set index.backend: sqlite and run strata refresh' \
+    "${VAULT}/0_core/tmp/turso.err" >/dev/null 2>&1 || fail "expected explicit Turso backend error"
 
 printf 'ok - rust db migration passed\n'

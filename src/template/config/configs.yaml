@@ -1,5 +1,8 @@
 profile: "coder"
 
+index:
+  backend: "sqlite"
+
 retention:
   archived_drafts_days: 180
   default_mode: "report"

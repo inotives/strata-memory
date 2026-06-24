@@ -103,6 +103,15 @@ Machine-readable install output:
 ./install.sh --vault ~/.strata-memory --json
 ```
 
+New vaults explicitly use the stable SQLite index backend:
+
+```yaml
+index:
+  backend: sqlite
+```
+
+Existing configs without `index.backend` continue to use SQLite. `turso` is reserved for the experimental backend and currently returns an explicit unavailable-backend error; it never falls back to SQLite.
+
 The installer:
 
 - initializes the vault structure

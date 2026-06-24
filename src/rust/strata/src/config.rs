@@ -1,3 +1,4 @@
+use crate::index::model::IndexBackend;
 use crate::Result;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -9,12 +10,20 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Deserialize, Serialize)]
 struct Config {
     profile: String,
+    #[serde(default)]
+    index: Index,
     retention: Retention,
     #[serde(default)]
     semantic: Semantic,
     tags: Tags,
     rooms: BTreeMap<String, Vec<RoomConfig>>,
     profiles: BTreeMap<String, Profile>,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+struct Index {
+    #[serde(default)]
+    backend: IndexBackend,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -112,6 +121,10 @@ pub(crate) fn semantic(vault: &Path) -> Result<Semantic> {
     Ok(read_config(vault)?.semantic)
 }
 
+pub(crate) fn index_backend(vault: &Path) -> Result<IndexBackend> {
+    Ok(read_config(vault)?.index.backend)
+}
+
 pub(crate) fn room_patterns(vault: &Path) -> Result<Vec<String>> {
     let config = read_config(vault)?;
     let mut patterns = Vec::new();
@@ -187,6 +200,7 @@ pub(crate) fn compile(vault: &Path) -> Result<CompileSummary> {
         "generated_at": Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
         "source": "0_core/config/configs.yaml",
         "profile": profile,
+        "index": config.index,
         "retention": config.retention,
         "semantic": config.semantic,
         "tags": {"allowed": tags},
