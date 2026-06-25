@@ -19,3 +19,15 @@ _Avoid_: Database migration, backend migration
 **Index database**:
 The rebuildable local database file owned by an index backend.
 _Avoid_: Turso database, primary database, source of truth
+
+**Semantic acceleration cache**:
+A disposable search structure and its freshness manifest, derived from embeddings in the active index database to reduce semantic query latency. It is never authoritative and may be deleted or rebuilt without losing memory.
+_Avoid_: Vector database, semantic backend, source of truth
+
+**Exact semantic search**:
+Semantic retrieval that compares a query vector with every eligible stored embedding.
+_Avoid_: Brute-force database search
+
+**Approximate semantic search**:
+Semantic retrieval that uses a derived nearest-neighbor structure to reduce comparisons while accepting measurable recall loss.
+_Avoid_: Exact vector search

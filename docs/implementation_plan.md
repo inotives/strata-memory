@@ -318,7 +318,28 @@ Exit criteria:
 - Turso is a complete opt-in backend with measured parity and reliability results.
 - SQLite remains the default and available fallback.
 
-## Phase 7: Workflow Runner and Richer Automation
+## Phase 7: Semantic Search Acceleration Evaluation
+
+Goal: determine whether exact Rust semantic search needs HNSW acceleration, and add it only when measured latency justifies the added lifecycle complexity.
+
+Reference: `docs/phase-7-semantic-acceleration-evaluation.md`
+
+Confirmed direction:
+
+1. Keep SQLite embeddings authoritative.
+2. Benchmark exact semantic search before adding approximate search.
+3. Trigger HNSW implementation only when semantic vector ranking exceeds 100 ms p95 on supported hardware at a documented dataset size.
+4. Measure complete hybrid search against a separate 150 ms p95 target.
+5. Use native Apple Silicon and native Linux performance results; emulation validates correctness only.
+6. Benchmark 25K and 100K embeddings as trigger scales, with 500K used only for capacity planning.
+7. Cover 64- and 384-dimensional vectors with 100 deterministic queries and 20 measured runs after warm-up.
+8. Use fixed-seed normalized clustered synthetic vectors; keep malformed-vector cases in correctness tests.
+9. Run a compatibility spike with `hnsw_rs` as the preferred candidate before selecting and exactly pinning a crate version.
+10. Treat any HNSW structure as a disposable semantic acceleration cache, not an index backend.
+
+Detailed checkpoints, test matrix, promotion gates, and exit verdicts are defined in the Phase 7 reference document.
+
+## Phase 8: Workflow Runner and Richer Automation
 
 Goal: execute workflow definitions with dependency checks and report generation.
 
@@ -341,7 +362,7 @@ Exit criteria:
 
 - Workflows run reproducibly without weakening script execution boundaries.
 
-## Phase 8: Optional Watchers and Real-Time Sync
+## Phase 9: Optional Watchers and Real-Time Sync
 
 Goal: automate indexing after external file edits only if explicit refresh proves too manual.
 

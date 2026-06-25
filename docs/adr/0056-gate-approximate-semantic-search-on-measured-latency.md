@@ -1,0 +1,3 @@
+# Gate approximate semantic search on measured latency
+
+Strata will benchmark the existing exact Rust semantic search before adding HNSW. Approximate semantic search is justified when semantic vector ranking exceeds 100 ms p95 on any supported native platform at a documented dataset size. Complete hybrid search is measured separately with a 150 ms p95 target, but FTS, process startup, or unrelated SQLite overhead cannot trigger HNSW implementation. Emulated platforms validate correctness only and do not supply performance evidence. SQLite embeddings remain authoritative; any HNSW structure is a disposable semantic acceleration cache, not an index backend or source of truth.

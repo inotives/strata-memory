@@ -775,11 +775,15 @@ The Turso 0.6.1 evaluation found the backend functionally usable: full-text sear
 
 SQLite remains the production default. Turso remains experimental and opt-in, with no automatic migration or fallback between backends. Re-evaluate Turso after its first upstream stable release intended for production use, focusing on full and repeated rebuild latency, index size, and recovery stability before considering any default change.
 
-### Phase 7: Workflow Runner and Richer Automation
+### Phase 7: Semantic Search Acceleration Evaluation
+
+Benchmark the existing exact Rust semantic search at representative embedding counts. Add a disposable HNSW acceleration cache only if exact semantic queries exceed 100 ms p95 on supported hardware. SQLite embeddings remain authoritative.
+
+### Phase 8: Workflow Runner and Richer Automation
 
 Add workflow execution orchestration after skills, agents, and reports have stable contracts.
 
-### Phase 8: Optional Watchers and Real-Time Sync
+### Phase 9: Optional Watchers and Real-Time Sync
 
 Add Linux and Apple Silicon macOS file watchers only if explicit refresh becomes painful. Watchers are deferred infrastructure polish, not the default freshness strategy.
 
