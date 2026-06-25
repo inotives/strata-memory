@@ -290,7 +290,7 @@ Exit criteria:
 
 Goal: support local installation on Apple Silicon macOS and determine whether embedded local Turso can eventually replace SQLite without changing the production default.
 
-Reference: `docs/phase-6-macos-turso-evaluation.md`
+Reference: `docs/_archived/phase-6-macos-turso-evaluation.md`
 
 Implementation steps:
 

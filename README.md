@@ -79,21 +79,21 @@ Strata-Memory does not auto-install dependencies. On Debian/Ubuntu-like systems:
 sudo apt install cargo rustc sqlite3 bash gawk sed findutils coreutils jq yq
 ```
 
+Supported local-build platforms are Linux and Apple Silicon macOS (`arm64`). Intel macOS is not supported.
+
 SQLite should support FTS5 for full search indexing. The Rust CLI detects FTS5 support and records migration `002` only when available.
 
 ## Install
 
-Build the Rust CLI, then install into the default vault:
+Install into the default vault:
 
 ```bash
-cargo build --manifest-path src/rust/strata/Cargo.toml --release
 ./install.sh
 ```
 
 Install into a custom vault:
 
 ```bash
-cargo build --manifest-path src/rust/strata/Cargo.toml --release
 ./install.sh --vault /path/to/vault
 ```
 
@@ -103,11 +103,24 @@ Machine-readable install output:
 ./install.sh --vault ~/.strata-memory --json
 ```
 
+New vaults explicitly use the stable SQLite index backend:
+
+```yaml
+index:
+  backend: sqlite
+```
+
+Existing configs without `index.backend` continue to use SQLite. To evaluate the embedded local Turso backend, set `backend: turso`, then run `strata refresh`. Turso uses the separate rebuildable file `0_core/db/strata-turso.db` and is marked experimental in migration, refresh, semantic status, and doctor output. Backend failures never fall back to SQLite.
+
+The Turso evaluation path supports full and target indexing, native Turso FTS, exact `vector_distance_cos` semantic retrieval, hybrid search, and backend-specific migrations. It does not use Turso Cloud, synchronization, or a custom approximate vector index.
+
 The installer:
 
 - initializes the vault structure
+- validates Linux or Apple Silicon macOS and runs `cargo build --release`
+- passes Cargo `--offline` when `STRATA_CARGO_OFFLINE=1`
 - copies managed engine files into `0_core/bin`, `0_core/db`, `0_core/doc`, `0_core/template`, and the one-off migration helper under `0_core/script`
-- copies the built Rust CLI into `0_core/bin/strata` when `src/rust/strata/target/release/strata` exists
+- copies the built Rust CLI into `0_core/bin/strata`
 - preserves existing `0_core/config/configs.yaml`
 - creates `.gitignore` and `AGENTS.md` only when missing
 - writes `0_core/manifest.json`

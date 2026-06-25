@@ -1,4 +1,5 @@
-use crate::{absolute_path, config, json_escape, posix_cksum, rel_path, Result};
+use crate::index::posix_cksum;
+use crate::{absolute_path, config, json_escape, rel_path, Result};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use std::fs;

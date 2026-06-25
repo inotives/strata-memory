@@ -27,7 +27,8 @@ esac
 
 assert_dir "${VAULT}/0_core/config"
 assert_dir "${VAULT}/0_core/cache"
-assert_dir "${VAULT}/0_core/db/migrations"
+assert_dir "${VAULT}/0_core/db/sqlite/migrations"
+assert_dir "${VAULT}/0_core/db/turso/migrations"
 assert_dir "${VAULT}/0_core/doc"
 assert_dir "${VAULT}/0_core/script/lib"
 assert_dir "${VAULT}/0_core/template"

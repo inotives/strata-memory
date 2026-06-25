@@ -235,3 +235,9 @@ Recovery tests interrupt a refresh and then rerun it. The interrupted index need
 ## Phase Exit
 
 Phase 6 completes when Apple Silicon support is validated, SQLite remains healthy as the default, the Turso opt-in path and known gaps are documented, and the versioned evaluation report has an explicit verdict. Turso does not need to pass the replacement-candidate gates for the phase to complete.
+
+## Outcome
+
+The Turso 0.6.1 backend is functionally usable for indexing, full-text search, exact vector search, hybrid search, semantic refresh, and interrupted-refresh recovery. The core backend contract passed in Linux ARM64 and AMD64 containers and natively on Apple Silicon. It is not a replacement candidate because rebuild latency and index size remain materially worse than SQLite, including on a temporary copy of the private vault.
+
+The phase verdict is `continue-evaluation`. SQLite remains the default; Turso remains experimental and opt-in. Re-evaluate after the first upstream stable release intended for production use. Any future promotion still requires an explicit decision and must pass the documented correctness, performance, size, and recovery gates.

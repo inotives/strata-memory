@@ -31,11 +31,25 @@ cargo build --manifest-path "${ROOT}/src/rust/strata/Cargo.toml" >/dev/null
 
 out=$("$STRATA_BIN" doctor --vault "$VAULT" --json)
 assert_contains "$out" '"ok":true' "healthy ok"
+assert_contains "$out" '"backend":"sqlite"' "sqlite backend"
+assert_contains "$out" '"experimental":false' "stable backend"
+assert_contains "$out" '"name":"index_backend"' "index backend check"
 assert_contains "$out" '"name":"migration_001"' "migration 001"
 assert_contains "$out" '"name":"tag_review"' "tag review"
 assert_contains "$out" '"name":"db_writable"' "db writable"
 assert_contains "$out" '"name":"agents"' "agents"
 assert_contains "$out" '"name":"status_review"' "status review"
+
+cp "${VAULT}/0_core/config/configs.yaml" "${VAULT}/0_core/config/configs.yaml.sqlite"
+sed 's/backend: "sqlite"/backend: "turso"/' \
+    "${VAULT}/0_core/config/configs.yaml.sqlite" > "${VAULT}/0_core/config/configs.yaml"
+if out=$("$STRATA_BIN" doctor --vault "$VAULT" --json 2>/dev/null); then
+    fail "expected doctor to reject unavailable Turso backend"
+fi
+assert_contains "$out" '"backend":"turso"' "Turso backend"
+assert_contains "$out" '"experimental":true' "experimental backend"
+assert_contains "$out" '"name":"index_backend"' "Turso backend check"
+mv "${VAULT}/0_core/config/configs.yaml.sqlite" "${VAULT}/0_core/config/configs.yaml"
 
 mkdir -p "${VAULT}/1_draft/research" "${VAULT}/2_knowledge/research"
 cat > "${VAULT}/1_draft/research/invalid-status.md" <<'EOF'

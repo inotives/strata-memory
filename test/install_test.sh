@@ -26,7 +26,6 @@ assert_contains() {
     grep -F "$needle" "$file" >/dev/null 2>&1 || fail "expected '$needle' in $file"
 }
 
-cargo build --release --manifest-path "${ROOT}/src/rust/strata/Cargo.toml" >/dev/null
 "${ROOT}/install.sh" --vault "$VAULT" >/dev/null
 
 assert_dir "${VAULT}/0_core/script/lib"
@@ -39,12 +38,15 @@ assert_file "${VAULT}/0_core/bin/strata"
 assert_file "${VAULT}/0_core/script/migration.sh"
 assert_file "${VAULT}/0_core/script/lib/paths.sh"
 assert_file "${VAULT}/0_core/config/configs.yaml"
-assert_file "${VAULT}/0_core/db/schema.sql"
-assert_file "${VAULT}/0_core/db/migrations/001_init.sql"
+assert_file "${VAULT}/0_core/db/sqlite/schema.sql"
+assert_file "${VAULT}/0_core/db/sqlite/migrations/001_init.sql"
+assert_file "${VAULT}/0_core/db/turso/schema.sql"
+assert_file "${VAULT}/0_core/db/turso/migrations/001_init.sql"
 assert_file "${VAULT}/0_core/doc/commands.md"
 assert_file "${VAULT}/0_core/manifest.json"
 assert_file "${VAULT}/.gitignore"
 assert_file "${VAULT}/AGENTS.md"
+"${VAULT}/0_core/bin/strata" --help >/dev/null
 
 printf '%s\n' 'user_config: true' > "${VAULT}/0_core/config/configs.yaml"
 mkdir -p "${VAULT}/2_knowledge/concept"
