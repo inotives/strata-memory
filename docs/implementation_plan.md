@@ -47,7 +47,7 @@ Implementation steps:
    - `sqlite.sh`
    - `log.sh`
 2. Implement `strata init` to create vault structure and bootstrap config.
-3. Implement `strata config-compile` using `yq` and `jq` for full mode.
+3. Implement `strata config-compile` in Rust.
 4. Implement `strata db-migrate` and initial schema migration.
 5. Implement `strata normalize` for constrained YAML frontmatter.
 6. Implement `strata index` for full scan and target indexing.

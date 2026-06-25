@@ -26,12 +26,12 @@ esac
 CACHE="${VAULT}/0_core/cache/config.compiled.json"
 [ -f "$CACHE" ] || fail "expected cache file"
 
-[ "$(jq -r '.profile' "$CACHE")" = "coder" ] || fail "expected coder profile"
-[ "$(jq -r '.index.backend' "$CACHE")" = "sqlite" ] || fail "expected sqlite index backend"
-[ "$(jq -r '.semantic.provider' "$CACHE")" = "" ] || fail "expected empty semantic provider"
-[ "$(jq -r '.semantic.model' "$CACHE")" = "" ] || fail "expected empty semantic model"
-[ "$(jq -r '.rooms[] | select(.pattern == "2_knowledge/entity/project/*") | .depth' "$CACHE")" = "recursive" ] || fail "expected project room"
-[ "$(jq -r '.profiles.coder.tier2_rooms[] | select(. == "entity/tool/*")' "$CACHE")" = "entity/tool/*" ] || fail "expected coder tool room"
+grep -F '"profile": "coder"' "$CACHE" >/dev/null || fail "expected coder profile"
+grep -F '"backend": "sqlite"' "$CACHE" >/dev/null || fail "expected sqlite index backend"
+grep -F '"provider": ""' "$CACHE" >/dev/null || fail "expected empty semantic provider"
+grep -F '"model": ""' "$CACHE" >/dev/null || fail "expected empty semantic model"
+grep -F '"pattern": "2_knowledge/entity/project/*"' "$CACHE" >/dev/null || fail "expected project room"
+grep -F '"entity/tool/*"' "$CACHE" >/dev/null || fail "expected coder tool room"
 
 cp "${VAULT}/0_core/config/configs.yaml" "${VAULT}/0_core/config/configs.yaml.bak"
 sed 's/- research/- Research/' "${VAULT}/0_core/config/configs.yaml.bak" > "${VAULT}/0_core/config/configs.yaml"
@@ -46,7 +46,7 @@ cp "${VAULT}/0_core/config/configs.yaml.bak" "${VAULT}/0_core/config/configs.yam
 sed '/^index:/,+1d' "${VAULT}/0_core/config/configs.yaml" > "${VAULT}/0_core/config/configs.yaml.legacy"
 mv "${VAULT}/0_core/config/configs.yaml.legacy" "${VAULT}/0_core/config/configs.yaml"
 "$STRATA_BIN" config-compile --vault "$VAULT" >/dev/null
-[ "$(jq -r '.index.backend' "$CACHE")" = "sqlite" ] || fail "expected legacy config to default to sqlite"
+grep -F '"backend": "sqlite"' "$CACHE" >/dev/null || fail "expected legacy config to default to sqlite"
 
 cp "${VAULT}/0_core/config/configs.yaml.bak" "${VAULT}/0_core/config/configs.yaml"
 sed 's/backend: "sqlite"/backend: "invalid"/' "${VAULT}/0_core/config/configs.yaml" > "${VAULT}/0_core/config/configs.yaml.invalid"

@@ -13,13 +13,13 @@
   <a href="docs/project_spec.md"><img alt="Status: implementation" src="https://img.shields.io/badge/status-implementation-white?style=for-the-badge&labelColor=000000"></a>
   <img alt="Runtime: Rust CLI" src="https://img.shields.io/badge/runtime-rust%20cli-white?style=for-the-badge&labelColor=000000">
   <img alt="Shell: migration helper" src="https://img.shields.io/badge/shell-migration%20helper-white?style=for-the-badge&labelColor=000000">
-  <img alt="Index: SQLite FTS5" src="https://img.shields.io/badge/index-sqlite%20fts5-white?style=for-the-badge&labelColor=000000">
+  <img alt="Index: SQLite default" src="https://img.shields.io/badge/index-sqlite%20default-white?style=for-the-badge&labelColor=000000">
 </p>
 
 <p align="center">
   <a href="docs/project_spec.md">Spec</a>
   ·
-  <a href="docs/decisions.md">Decisions</a>
+  <a href="docs/adr/">ADRs</a>
   ·
   <a href="docs/implementation_plan.md">Implementation Plan</a>
   ·
@@ -30,7 +30,7 @@
 
 ## What It Is
 
-Strata-Memory is a local-first memory system for agentic work. Markdown files are canonical. SQLite is a rebuildable derived index for search, metadata queries, link review, and retrieval workflows.
+Strata-Memory is a local-first memory system for agentic work. Markdown files are canonical; the local search database is a rebuildable derived index.
 
 This repository is the public engine repo. It contains the Rust CLI, installer, migration helper, templates, tests, and documentation for installing Strata into a private vault.
 
@@ -55,126 +55,74 @@ The public repo should not contain vault-runtime folders at its root. Engine sou
 
 ## Dependencies
 
-Primary runtime:
+Required:
 
 ```text
-rust cargo sqlite3
-```
-
-Shell wrappers and remaining Bash fallback commands require:
-
-```text
-bash awk sed find sort mktemp cksum date
-```
-
-Full-mode configuration compilation requires:
-
-```text
-jq yq
+rust cargo sqlite3 bash
 ```
 
 Strata-Memory does not auto-install dependencies. On Debian/Ubuntu-like systems:
 
 ```bash
-sudo apt install cargo rustc sqlite3 bash gawk sed findutils coreutils jq yq
+sudo apt install cargo rustc sqlite3 bash gawk sed findutils coreutils
+```
+
+On Apple Silicon macOS with Homebrew:
+
+```bash
+brew install rust
 ```
 
 Supported local-build platforms are Linux and Apple Silicon macOS (`arm64`). Intel macOS is not supported.
 
 SQLite should support FTS5 for full search indexing. The Rust CLI detects FTS5 support and records migration `002` only when available.
 
-## Install
+## Install and First Run
 
-Install into the default vault:
+Install into the default vault at `~/.strata-memory`:
 
 ```bash
 ./install.sh
 ```
 
-Install into a custom vault:
+The installer builds the release binary, initializes the vault structure, updates managed files, and preserves existing user configuration and content.
+
+Add the installed CLI to your shell path for the commands below:
+
+```bash
+export PATH="$HOME/.strata-memory/0_core/bin:$PATH"
+```
+
+Create the index, validate the vault, and run a first search:
+
+```bash
+strata db-migrate --vault ~/.strata-memory
+strata refresh --vault ~/.strata-memory
+strata doctor --vault ~/.strata-memory
+strata search --query "example" --vault ~/.strata-memory
+```
+
+Useful installer options:
 
 ```bash
 ./install.sh --vault /path/to/vault
-```
-
-Machine-readable install output:
-
-```bash
 ./install.sh --vault ~/.strata-memory --json
+STRATA_CARGO_OFFLINE=1 ./install.sh
 ```
-
-New vaults explicitly use the stable SQLite index backend:
-
-```yaml
-index:
-  backend: sqlite
-```
-
-Existing configs without `index.backend` continue to use SQLite. To evaluate the embedded local Turso backend, set `backend: turso`, then run `strata refresh`. Turso uses the separate rebuildable file `0_core/db/strata-turso.db` and is marked experimental in migration, refresh, semantic status, and doctor output. Backend failures never fall back to SQLite.
-
-The Turso evaluation path supports full and target indexing, native Turso FTS, exact `vector_distance_cos` semantic retrieval, hybrid search, and backend-specific migrations. It does not use Turso Cloud, synchronization, or a custom approximate vector index.
-
-The installer:
-
-- initializes the vault structure
-- validates Linux or Apple Silicon macOS and runs `cargo build --release`
-- passes Cargo `--offline` when `STRATA_CARGO_OFFLINE=1`
-- copies managed engine files into `0_core/bin`, `0_core/db`, `0_core/doc`, `0_core/template`, and the one-off migration helper under `0_core/script`
-- copies the built Rust CLI into `0_core/bin/strata`
-- preserves existing `0_core/config/configs.yaml`
-- creates `.gitignore` and `AGENTS.md` only when missing
-- writes `0_core/manifest.json`
-
-After install, run:
-
-```bash
-~/.strata-memory/0_core/bin/strata db-migrate --vault ~/.strata-memory
-~/.strata-memory/0_core/bin/strata doctor --vault ~/.strata-memory
-```
-
-## Rust CLI
-
-The primary engine is the installed Rust binary:
-
-```text
-~/.strata-memory/0_core/bin/strata
-```
-
-Runtime commands:
-
-```text
-strata init --vault PATH [--json]
-strata db-migrate --vault PATH [--json]
-strata config-compile --vault PATH [--json]
-strata agents-generate --vault PATH [--json]
-strata index [--target FILE | --full] --vault PATH [--json]
-strata search --query TEXT --vault PATH [--limit N] [--include-archived] [--paths-only] [--json]
-strata link-review --vault PATH [--json]
-strata normalize --target FILE --vault PATH [--check] [--json]
-strata promote --source FILE --to 2_knowledge[/ROOM]|3_intelligence[/ROOM] [--new-slug SLUG] --vault PATH [--json]
-strata retention --vault PATH [--apply] [--json]
-strata doctor --vault PATH [--json]
-strata tag-review --vault PATH [--json]
-strata room-review --vault PATH [--json]
-strata privacy-review --vault PATH [--json]
-```
-
-`0_core/script/migration.sh` remains as one-off legacy migration tooling. It is not part of the normal runtime command surface.
-
-Rust full indexing reports progress on stderr when run interactively. For non-interactive runs, set `STRATA_INDEX_PROGRESS_EVERY=N` to print progress every N scanned files, or `0` to disable progress.
 
 ## Common Commands
-
-Use the installed Rust CLI for runtime commands.
 
 | Command | Purpose |
 |---|---|
 | `strata init --vault PATH [--json]` | Create the vault directory layout. |
-| `strata db-migrate --vault PATH [--json]` | Create or update the derived SQLite schema. |
+| `strata db-migrate --vault PATH [--json]` | Create or update the active index backend schema. |
+| `strata refresh --vault PATH [--json]` | Rebuild the active index from Markdown. |
 | `strata config-compile --vault PATH [--json]` | Validate config and write `0_core/cache/config.compiled.json`. |
 | `strata agents-generate --vault PATH [--json]` | Generate vault `AGENTS.md` while preserving manual sections. |
-| `strata index [--target FILE \| --full] --vault PATH [--json]` | Index Markdown files into SQLite. |
-| `strata search --query TEXT --vault PATH [--limit N] [--include-archived] [--paths-only] [--json]` | Search indexed memory with SQLite FTS5. |
+| `strata index [--target FILE \| --full] --vault PATH [--json]` | Index one file or the full vault. |
+| `strata search --query TEXT --vault PATH [--limit N] [--include-archived] [--paths-only] [--hybrid] [--json]` | Search indexed memory. |
+| `strata semantic-refresh --vault PATH [--json]` | Rebuild local semantic embeddings. |
+| `strata semantic-status --vault PATH [--json]` | Report semantic search readiness. |
 | `strata link-review --vault PATH [--json]` | Review local Markdown links. Broken durable links are blocking errors. |
 | `strata normalize --target FILE --vault PATH [--check] [--json]` | Normalize constrained Markdown frontmatter. |
 | `strata promote --source FILE --to 2_knowledge[/ROOM]\|3_intelligence[/ROOM] [--new-slug SLUG] --vault PATH [--json]` | Promote a draft into a durable tier or concrete room and archive the original. |
@@ -183,9 +131,23 @@ Use the installed Rust CLI for runtime commands.
 | `strata tag-review --vault PATH [--json]` | Review frontmatter tags against allowed tags. |
 | `strata room-review --vault PATH [--json]` | Report files outside registered room patterns. |
 | `strata privacy-review --vault PATH [--json]` | Report local-path and privacy warnings. |
-| `0_core/script/migration.sh --from PATH --to PATH --section NAME\|--all [--json]` | One-off legacy Agent Memory migration helper. |
 
 `strata promote --to 2_knowledge` and `--to 3_intelligence` preserve the draft subfolder. For example, `1_draft/research/foo.md` promotes to `2_knowledge/research/foo.md`. Passing a concrete room such as `--to 2_knowledge/entity/website` promotes directly into that room.
+
+Full indexing reports progress on stderr when run interactively. For non-interactive runs, set `STRATA_INDEX_PROGRESS_EVERY=N`, or `0` to disable progress.
+
+## Index Backends
+
+SQLite is the stable default. New vaults use:
+
+```yaml
+index:
+  backend: sqlite
+```
+
+Existing configs without `index.backend` also use SQLite.
+
+Embedded local Turso is available for evaluation by setting `backend: turso` and running `strata refresh`. It uses `0_core/db/strata-turso.db`, never falls back to SQLite, and does not use Turso Cloud or synchronization. Turso remains experimental because rebuild performance and index size do not yet meet the SQLite replacement gates.
 
 ## Draft Templates
 
@@ -197,44 +159,35 @@ Installed vault templates live under `0_core/template`. Research drafts can star
 
 The research draft template records generation context before review: `type`, `generated_by`, `generated_at`, `research_method`, `confidence`, `summary`, and `sources_cited`. Drafts use `strata: "1_draft"` and `status: "pending"` until promotion.
 
-## Database And Recovery
+## Database and Recovery
 
-Markdown files are the source of truth. The SQLite database at `~/.strata-memory/0_core/db/strata.db` is a derived index and can be rebuilt.
+Markdown files are the source of truth. Index databases are derived and rebuildable. SQLite uses `0_core/db/strata.db`; Turso uses `0_core/db/strata-turso.db`.
 
-If indexing reports SQLite lock, journal, or disk I/O errors after a crash or reboot, first check that the vault filesystem is writable:
-
-```bash
-findmnt -T ~/.strata-memory -no TARGET,OPTIONS
-~/.strata-memory/0_core/bin/strata doctor --vault ~/.strata-memory --json
-```
-
-The `findmnt` output should not show `ro`. `strata doctor` reports whether `0_core/tmp` and `0_core/db` are writable.
-
-After the filesystem is healthy, rebuild only the derived index:
+If indexing reports lock, journal, or disk I/O errors after a crash or reboot, first run:
 
 ```bash
-rm -f ~/.strata-memory/0_core/db/strata.db ~/.strata-memory/0_core/db/strata.db-journal
-~/.strata-memory/0_core/bin/strata db-migrate --vault ~/.strata-memory
-~/.strata-memory/0_core/bin/strata index --vault ~/.strata-memory --full --json
+strata doctor --vault ~/.strata-memory --json
 ```
 
-Validate the rebuilt database:
+After confirming the filesystem and database directory are writable, rebuild the active backend:
 
 ```bash
-sqlite3 ~/.strata-memory/0_core/db/strata.db 'PRAGMA quick_check;'
-~/.strata-memory/0_core/bin/strata doctor --vault ~/.strata-memory --json
+strata refresh --vault ~/.strata-memory --json
+strata doctor --vault ~/.strata-memory --json
 ```
 
-## Reviews And Validation
+Do not delete Markdown content during index recovery. Delete an index database only when normal refresh recovery fails and after preserving a copy for diagnosis.
+
+## Reviews and Validation
 
 Run these after bulk edits:
 
 ```bash
-~/.strata-memory/0_core/bin/strata doctor --vault ~/.strata-memory --json
-~/.strata-memory/0_core/bin/strata tag-review --vault ~/.strata-memory --json
-~/.strata-memory/0_core/bin/strata room-review --vault ~/.strata-memory --json
-~/.strata-memory/0_core/bin/strata link-review --vault ~/.strata-memory --json
-~/.strata-memory/0_core/bin/strata privacy-review --vault ~/.strata-memory --json
+strata doctor --vault ~/.strata-memory --json
+strata tag-review --vault ~/.strata-memory --json
+strata room-review --vault ~/.strata-memory --json
+strata link-review --vault ~/.strata-memory --json
+strata privacy-review --vault ~/.strata-memory --json
 ```
 
 Review semantics:
@@ -242,27 +195,33 @@ Review semantics:
 - tag and room issues are warnings in `doctor`
 - broken durable local links are blocking errors
 - privacy review reports warnings without blocking
-- missing full-mode dependencies (`jq`, `yq`) are warnings in `doctor`
 
 ## Development
 
 Run focused checks:
 
 ```bash
-rtk bash -n install.sh src/script/migration.sh src/script/lib/*.sh test/*.sh
-rtk cargo check --manifest-path src/rust/strata/Cargo.toml
-rtk bash test/rust_doctor_test.sh
+bash -n install.sh src/script/migration.sh src/script/lib/*.sh test/*.sh
+cargo check --manifest-path src/rust/strata/Cargo.toml
+bash test/rust_doctor_test.sh
 ```
 
 Run the full test suite:
 
 ```bash
 for f in test/*_test.sh; do
-  rtk bash "$f"
+  bash "$f"
 done
 ```
 
-The test suite uses fixture vaults under `test/tmp/`.
+Run the Linux core suite in Docker:
+
+```bash
+test/linux_container_smoke.sh linux/arm64
+test/linux_container_smoke.sh linux/amd64
+```
+
+Tests use fixture vaults under `test/tmp/`; they do not operate on the installed private vault.
 
 ## Repository Layout
 
@@ -280,6 +239,12 @@ strata-memory/
 ├── License.md
 └── README.md
 ```
+
+## Future Evaluation
+
+The current Turso verdict is `continue-evaluation`: it is functionally usable but does not yet meet SQLite replacement gates for rebuild performance and index size. SQLite remains the default, and Turso remains experimental and opt-in.
+
+Re-evaluate Turso after its first upstream stable release intended for production use. See the [latest Turso evaluation](docs/evaluations/turso-latest.md) for results, failed gates, and the next evaluation criteria.
 
 ## License
 

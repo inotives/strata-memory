@@ -599,13 +599,6 @@ sort
 mktemp
 ```
 
-Full mode:
-
-```text
-yq
-jq
-```
-
 `strata init` checks dependencies and prints install guidance. It does not install packages automatically.
 
 Temporary files must live under `0_core/tmp/`, using `mktemp` with a vault-local template:

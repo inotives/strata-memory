@@ -10,7 +10,6 @@ use std::process::Command;
 const BOOTSTRAP_DEPENDENCIES: &[&str] = &[
     "bash", "sqlite3", "awk", "sed", "find", "sort", "mktemp", "cksum", "date",
 ];
-const FULL_DEPENDENCIES: &[&str] = &["jq", "yq"];
 const REQUIRED_DIRS: &[&str] = &[
     "0_core/config",
     "0_core/cache",
@@ -110,19 +109,6 @@ fn record_dependencies(checks: &mut Vec<Check>) {
                 "Missing bootstrap dependencies: {}",
                 missing_bootstrap.join(" ")
             ),
-        ));
-    }
-
-    let missing_full = missing_dependencies(FULL_DEPENDENCIES);
-    if missing_full.is_empty() {
-        checks.push(pass(
-            "full_dependencies",
-            "full-mode dependencies are available",
-        ));
-    } else {
-        checks.push(warn(
-            "full_dependencies",
-            &format!("Missing full-mode dependencies: {}", missing_full.join(" ")),
         ));
     }
 }
