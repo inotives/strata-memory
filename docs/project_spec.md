@@ -776,7 +776,11 @@ Phase 5 is split into two implementation PRs:
 
 ### Phase 6: Apple Silicon macOS and Turso Index Backend Evaluation
 
-Support local builds and installation on Apple Silicon macOS. Add `index.backend: sqlite|turso`, keeping SQLite/rusqlite as the default and embedded local Turso as an opt-in complete backend using a separate rebuildable database. Evaluate Turso full-text behavior, exact vector search, correctness, stability, and performance before any later replacement decision.
+Support local builds and installation on Apple Silicon macOS. Add `index.backend: sqlite|turso`, keeping SQLite/rusqlite as the default and embedded local Turso as an opt-in complete backend using a separate rebuildable database.
+
+The Turso 0.6.1 evaluation found the backend functionally usable: full-text search, exact vector search, hybrid search, semantic refresh, and interrupted-refresh recovery worked on synthetic fixtures and an approved temporary copy of the private vault. Turso did not meet the replacement gates because full rebuilds were substantially slower and its index used materially more disk space than SQLite. The verdict is `continue-evaluation`.
+
+SQLite remains the production default. Turso remains experimental and opt-in, with no automatic migration or fallback between backends. Re-evaluate Turso after its first upstream stable release intended for production use, focusing on full and repeated rebuild latency, index size, and recovery stability before considering any default change.
 
 ### Phase 7: Workflow Runner and Richer Automation
 
