@@ -61,6 +61,28 @@ copy_tree() {
     )
 }
 
+check_runtime_dependencies() {
+    local dependency
+    local missing=()
+
+    for dependency in bash sqlite3 awk sed find sort mktemp cksum date; do
+        command -v "$dependency" >/dev/null 2>&1 || missing+=("$dependency")
+    done
+
+    [ "${#missing[@]}" -eq 0 ] && return 0
+
+    printf 'Missing runtime prerequisites: %s\n' "${missing[*]}" >&2
+    case "$(uname -s)" in
+        Darwin)
+            printf '%s\n' 'Install the missing tools with Homebrew, then rerun install.sh.' >&2
+            ;;
+        Linux)
+            printf '%s\n' 'On Debian/Ubuntu: sudo apt install sqlite3 bash gawk sed findutils coreutils' >&2
+            ;;
+    esac
+    return 1
+}
+
 create_vault_dirs() {
     for rel in \
         "0_core/config" \
@@ -150,7 +172,33 @@ write_manifest() {
     } > "$manifest"
 }
 
+run_bootstrap() {
+    local stage output line
+
+    for stage in db-migrate refresh doctor; do
+        if [ "$json" = true ]; then
+            output=$(mktemp)
+            if ! "${CORE}/bin/strata" "$stage" --vault "$VAULT" --json >"$output"; then
+                while IFS= read -r line; do
+                    printf '%s\n' "$line" >&2
+                done < "$output"
+                rm -f "$output"
+                printf 'Installation bootstrap failed during %s\n' "$stage" >&2
+                return 1
+            fi
+            rm -f "$output"
+        else
+            printf 'Bootstrapping: %s\n' "$stage"
+            if ! "${CORE}/bin/strata" "$stage" --vault "$VAULT"; then
+                printf 'Installation bootstrap failed during %s\n' "$stage" >&2
+                return 1
+            fi
+        fi
+    done
+}
+
 mkdir -p "$CORE"
+check_runtime_dependencies
 create_vault_dirs
 build_strata
 
@@ -177,6 +225,7 @@ fi
 find "${CORE}/script" -type f -name '*.sh' -exec chmod +x {} \;
 [ ! -f "${CORE}/bin/strata" ] || chmod +x "${CORE}/bin/strata"
 write_manifest
+run_bootstrap
 
 if [ "$json" = true ]; then
     printf '{"ok":true,"vault":"%s","manifest":"%s"}\n' "$VAULT" "${CORE}/manifest.json"

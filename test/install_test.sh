@@ -26,6 +26,10 @@ assert_contains() {
     grep -F "$needle" "$file" >/dev/null 2>&1 || fail "expected '$needle' in $file"
 }
 
+assert_single_line() {
+    [ "$(printf '%s\n' "$1" | wc -l | tr -d ' ')" = 1 ] || fail "expected one line"
+}
+
 "${ROOT}/install.sh" --vault "$VAULT" >/dev/null
 
 assert_dir "${VAULT}/0_core/script/lib"
@@ -47,17 +51,38 @@ assert_file "${VAULT}/0_core/manifest.json"
 assert_file "${VAULT}/.gitignore"
 assert_file "${VAULT}/AGENTS.md"
 "${VAULT}/0_core/bin/strata" --help >/dev/null
+"${VAULT}/0_core/bin/strata" doctor --vault "$VAULT" >/dev/null
+"${VAULT}/0_core/bin/strata" search --query "example" --vault "$VAULT" >/dev/null
 
-printf '%s\n' 'user_config: true' > "${VAULT}/0_core/config/configs.yaml"
+printf '%s\n' '# user configuration is preserved' >> "${VAULT}/0_core/config/configs.yaml"
 mkdir -p "${VAULT}/2_knowledge/concept"
-printf '%s\n' 'user content' > "${VAULT}/2_knowledge/concept/user.md"
+cat > "${VAULT}/2_knowledge/concept/user.md" <<'MARKDOWN'
+---
+title: User Content
+description: Content preserved across installation.
+status: verified
+---
+
+# User Content
+MARKDOWN
 
 "${ROOT}/install.sh" --vault "$VAULT" >/dev/null
 
-assert_contains "${VAULT}/0_core/config/configs.yaml" "user_config: true"
-assert_contains "${VAULT}/2_knowledge/concept/user.md" "user content"
+assert_contains "${VAULT}/0_core/config/configs.yaml" "user configuration is preserved"
+assert_contains "${VAULT}/2_knowledge/concept/user.md" "User Content"
 assert_contains "${VAULT}/0_core/manifest.json" '"managed_root": "0_core"'
 assert_contains "${VAULT}/0_core/manifest.json" '"path":"0_core/bin/strata"'
 assert_contains "${VAULT}/0_core/manifest.json" '"path":"0_core/script/migration.sh"'
+"${VAULT}/0_core/bin/strata" doctor --vault "$VAULT" >/dev/null
+"${VAULT}/0_core/bin/strata" search --query "User Content" --vault "$VAULT" | grep -F 'User Content' >/dev/null
+
+JSON_VAULT=$(mktemp -d "${TMP_ROOT}/install-json-test-XXXXXXXX")
+JSON_OUTPUT=$("${ROOT}/install.sh" --vault "$JSON_VAULT" --json)
+rm -rf "$JSON_VAULT"
+assert_single_line "$JSON_OUTPUT"
+case "$JSON_OUTPUT" in
+    '{"ok":true,"vault":'*',"manifest":'*'}') ;;
+    *) fail "expected installer JSON output" ;;
+esac
 
 printf 'ok - install fixture passed\n'

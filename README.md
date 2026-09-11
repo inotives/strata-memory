@@ -85,7 +85,7 @@ Install into the default vault at `~/.strata-memory`:
 ./install.sh
 ```
 
-The installer builds the release binary, initializes the vault structure, updates managed files, and preserves existing user configuration and content.
+The installer builds the release binary, initializes the vault structure, updates managed files, migrates and rebuilds the derived index, then verifies vault health. It preserves existing user configuration and content.
 
 Add the installed CLI to your shell path for the commands below:
 
@@ -93,12 +93,9 @@ Add the installed CLI to your shell path for the commands below:
 export PATH="$HOME/.strata-memory/0_core/bin:$PATH"
 ```
 
-Create the index, validate the vault, and run a first search:
+Run a first search:
 
 ```bash
-strata db-migrate --vault ~/.strata-memory
-strata refresh --vault ~/.strata-memory
-strata doctor --vault ~/.strata-memory
 strata search --query "example" --vault ~/.strata-memory
 ```
 

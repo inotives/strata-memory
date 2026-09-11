@@ -16,6 +16,10 @@ _Avoid_: Default database, current indexer
 Regeneration of the active backend's complete derived index from the Markdown vault. It does not convert or copy index state between backends.
 _Avoid_: Database migration, backend migration
 
+**Vault bootstrap**:
+Installation-time preparation that makes a vault's rebuildable search infrastructure ready for use.
+_Avoid_: Installation, setup
+
 **Index database**:
 The rebuildable local database file owned by an index backend.
 _Avoid_: Turso database, primary database, source of truth
