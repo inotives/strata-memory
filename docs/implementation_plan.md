@@ -322,7 +322,7 @@ Exit criteria:
 
 Goal: determine whether exact Rust semantic search needs HNSW acceleration, and add it only when measured latency justifies the added lifecycle complexity.
 
-Reference: `docs/phase-7-semantic-acceleration-evaluation.md`
+Reference: `docs/_archived/phase-7-semantic-acceleration-evaluation.md`
 
 Confirmed direction:
 
