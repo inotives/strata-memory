@@ -1,3 +1,4 @@
+use crate::index::model::{collect_markdown_files as collect_index_markdown_files, read_document};
 use crate::index::posix_cksum;
 use crate::{absolute_path, config, json_escape, rel_path, Result};
 use chrono::{DateTime, Utc};
@@ -315,6 +316,9 @@ pub(crate) fn promote(
         return Err(format!("archive target exists: {archive_rel}").into());
     }
 
+    let promoted_id = parsed.scalar("id").unwrap_or_else(|| make_id(&target_rel));
+    reject_duplicate_document_id(vault, &promoted_id, &source_rel)?;
+
     let now = Utc::now();
     let promoted = build_promote_candidate(
         &parsed,
@@ -375,6 +379,19 @@ pub(crate) fn promote(
         archive: log["archive"].as_str().unwrap_or_default().to_string(),
         log: log_rel,
     })
+}
+
+fn reject_duplicate_document_id(vault: &Path, id: &str, source_rel: &str) -> Result<()> {
+    for file in collect_index_markdown_files(vault)? {
+        let Some(indexed) = read_document(vault, &file)? else {
+            continue;
+        };
+        let document = indexed.document;
+        if document.path != source_rel && document.id == id {
+            return Err(format!("document ID already exists: {id} at {}", document.path).into());
+        }
+    }
+    Ok(())
 }
 
 fn promote_target_room(to: &str, draft_dir: &str) -> Result<String> {

@@ -181,8 +181,24 @@ fn run() -> Result<()> {
             }
         }
         Command::Promote(args) => {
-            let summary =
-                lifecycle::promote(&cli.vault, &args.source, &args.to, args.new_slug.as_deref())?;
+            let summary = match lifecycle::promote(
+                &cli.vault,
+                &args.source,
+                &args.to,
+                args.new_slug.as_deref(),
+            ) {
+                Ok(summary) => summary,
+                Err(err) => {
+                    let message = err.to_string();
+                    if cli.json && message.starts_with("document ID already exists:") {
+                        println!(
+                            "{{\"ok\":false,\"error\":\"duplicate_document_id\",\"message\":\"{}\"}}",
+                            json_escape(&message)
+                        );
+                    }
+                    return Err(err);
+                }
+            };
             index::refresh(
                 &cli.vault,
                 IndexMode::Target(cli.vault.join(&summary.target)),

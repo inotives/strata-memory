@@ -23,6 +23,7 @@ Research drafts should start from the managed template at `0_core/template/draft
 - Reuse existing tags before inventing new ones.
 - Use relative POSIX Markdown links for local vault references. Do not use wikilinks.
 - Do not use absolute local paths or `file://` links in vault content.
+- Use `strata promote` only for a new durable document. To revise an already-promoted document, edit its existing durable file directly, preserve its `id`, increment `version`, and update `modified` and `last_edit_summary` when present.
 - Keep responses concise unless the user asks otherwise.
 - Do not assume. Surface tradeoffs and uncertainty.
 
