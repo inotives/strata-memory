@@ -107,6 +107,23 @@ Useful installer options:
 STRATA_CARGO_OFFLINE=1 ./install.sh
 ```
 
+## Update an Existing Vault
+
+From an up-to-date source checkout, rebuild and reinstall Strata into an
+existing vault:
+
+```bash
+git fetch origin
+git switch main
+git pull --ff-only
+./install.sh --vault "$HOME/.strata-memory"
+"$HOME/.strata-memory/0_core/bin/strata" doctor --vault "$HOME/.strata-memory"
+```
+
+This rebuilds the release binary and derived index while preserving your
+Markdown and `0_core/config/configs.yaml`. It does not edit shell profiles or
+require manually copying a binary.
+
 ## Common Commands
 
 | Command | Purpose |

@@ -79,6 +79,34 @@ target_index=$(/usr/bin/sqlite3 "$DB" "SELECT count(*) FROM memory_index WHERE p
 assert_eq "$target_index" "1" "target indexed"
 archive_index=$(/usr/bin/sqlite3 "$DB" "SELECT count(*) FROM memory_index WHERE path = '1_draft/_archived/research/sqlite-fts.md' AND status = 'archived';")
 assert_eq "$archive_index" "1" "archive indexed"
+"$STRATA_BIN" refresh --vault "$VAULT" >/dev/null
+target_id=$(/usr/bin/sqlite3 "$DB" "SELECT id FROM memory_index WHERE path = '2_knowledge/research/sqlite-fts.md';")
+archive_id=$(/usr/bin/sqlite3 "$DB" "SELECT id FROM memory_index WHERE path = '1_draft/_archived/research/sqlite-fts.md';")
+assert_eq "$target_id" "mem_promote_001" "target logical ID"
+assert_eq "$archive_id" "mem_promote_001_archived" "archive index ID"
+
+cat > "${VAULT}/1_draft/research/duplicate-id.md" <<'EOF'
+---
+id: "mem_promote_001"
+title: "Duplicate ID"
+description: "Must not create a second promoted document."
+status: "pending"
+tags:
+  - research
+---
+# Duplicate ID
+EOF
+
+DUPLICATE_JSON=$(mktemp "${TMP_ROOT}/rust-promote-duplicate-XXXXXXXX")
+if "$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/duplicate-id.md" --to 2_knowledge --json > "$DUPLICATE_JSON" 2>/dev/null; then
+    fail "expected duplicate document ID promotion to fail"
+fi
+assert_contains "$DUPLICATE_JSON" '"ok":false'
+assert_contains "$DUPLICATE_JSON" '"error":"duplicate_document_id"'
+rm -f "$DUPLICATE_JSON"
+assert_file "${VAULT}/1_draft/research/duplicate-id.md"
+assert_missing "${VAULT}/2_knowledge/research/duplicate-id.md"
+assert_missing "${VAULT}/1_draft/_archived/research/duplicate-id.md"
 
 cat > "${VAULT}/2_knowledge/research/conflict.md" <<'EOF'
 ---
