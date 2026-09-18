@@ -91,15 +91,15 @@ case "$default_results" in
     *"1_draft/_archived/research/archived-alpha.md"*) fail "archived result should be excluded by default" ;;
 esac
 
-archived_results=$("$STRATA_BIN" search --vault "$VAULT" --query alpha --paths-only --include-archived --limit 10)
-assert_contains "$archived_results" "1_draft/_archived/research/archived-alpha.md" "include archived"
-
 human=$("$STRATA_BIN" search --vault "$VAULT" --query alpha --limit 2)
 assert_contains "$human" "[alpha]" "snippet"
 
 json=$("$STRATA_BIN" search --vault "$VAULT" --query alpha --json --limit 1)
 assert_contains "$json" '"ok":true' "json ok"
 assert_contains "$json" '"refreshed":false' "json not refreshed"
+
+hyphenated=$("$STRATA_BIN" search --vault "$VAULT" --query 'alpha-title' --paths-only --limit 1)
+assert_eq "$hyphenated" "2_knowledge/concept/alpha-title.md" "hyphenated query"
 assert_contains "$json" '"requested_mode":"fts"' "json requested fts"
 assert_contains "$json" '"mode":"fts"' "json mode fts"
 assert_contains "$json" '"warnings":[]' "json no warnings"
@@ -152,10 +152,5 @@ assert_contains "$refresh_json" '"path":"2_knowledge/concept/fresh.md"' "refresh
 refresh_cmd_json=$("$STRATA_BIN" refresh --vault "$VAULT" --json)
 assert_contains "$refresh_cmd_json" '"ok":true' "refresh command json ok"
 assert_contains "$refresh_cmd_json" '"indexed":' "refresh command indexed count"
-
-MISSING_VAULT=$(mktemp -d "${TMP_ROOT}/rust-search-missing-db-XXXXXXXX")
-"${ROOT}/install.sh" --vault "$MISSING_VAULT" >/dev/null
-missing_out=$("$STRATA_BIN" search --vault "$MISSING_VAULT" --query alpha 2>&1 || true)
-assert_contains "$missing_out" "run strata refresh first" "missing db guidance"
 
 printf 'ok - rust search passed\n'

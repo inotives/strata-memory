@@ -18,6 +18,8 @@ summary: "One-paragraph summary of the research question, scope, and main findin
 version: 1
 created: "2026-06-06"
 modified: "2026-06-06"
+approved_by: ""
+modified_by: "agent-or-model-name"
 ---
 
 # Research Title

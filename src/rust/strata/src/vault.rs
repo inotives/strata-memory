@@ -24,18 +24,15 @@ const VAULT_DIRS: &[&str] = &[
     "1_draft/agent",
     "1_draft/workflow",
     "1_draft/session",
-    "1_draft/_archived",
     "2_knowledge/concept",
     "2_knowledge/entity",
     "2_knowledge/research",
     "2_knowledge/note",
     "2_knowledge/preference",
-    "2_knowledge/_archived",
     "3_intelligence/skill",
     "3_intelligence/agent",
     "3_intelligence/workflow",
     "3_intelligence/report",
-    "3_intelligence/_archived",
 ];
 
 pub(crate) fn init(vault: &Path) -> Result<()> {

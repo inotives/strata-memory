@@ -84,8 +84,8 @@ assert_contains "$out" '"ok":true' "semantic refresh json ok"
 assert_contains "$out" '"provider":"builtin-hash"' "semantic refresh provider"
 assert_contains "$out" '"model":"hash-v1"' "semantic refresh model"
 assert_contains "$out" '"embedding_dim":64' "semantic refresh dim"
-assert_contains "$out" '"descriptions":2' "empty descriptions skipped"
-assert_contains "$out" '"sections":4' "sections embedded"
+assert_contains "$out" '"descriptions":1' "legacy archives ignored"
+assert_contains "$out" '"sections":3' "legacy archive sections ignored"
 
 DB="${VAULT}/0_core/db/strata.db"
 empty_description_count=$("$SQLITE_BIN" "$DB" "SELECT count(*) FROM semantic_embeddings WHERE path = '2_knowledge/concept/empty-description.md' AND target_type = 'description';")
@@ -111,8 +111,5 @@ assert_contains "$hybrid_json" '"path":"2_knowledge/concept/vector-alpha.md"' "h
 case "$hybrid_json" in
     *"1_draft/_archived/research/archived-vector.md"*) fail "archived semantic result should be excluded by default" ;;
 esac
-
-archived_hybrid=$("$STRATA_BIN" search --vault "$VAULT" --query vector --hybrid --include-archived --paths-only --limit 10)
-assert_contains "$archived_hybrid" "1_draft/_archived/research/archived-vector.md" "hybrid include archived"
 
 printf 'ok - rust semantic refresh passed\n'

@@ -1,8 +1,7 @@
 use crate::index::model::{collect_markdown_files as collect_index_markdown_files, read_document};
 use crate::index::posix_cksum;
-use crate::{absolute_path, config, json_escape, rel_path, Result};
-use chrono::{DateTime, Utc};
-use serde::Serialize;
+use crate::{absolute_path, json_escape, rel_path, Result};
+use chrono::Utc;
 use std::fs;
 use std::path::Path;
 
@@ -12,41 +11,9 @@ pub(crate) struct NormalizeSummary {
     pub(crate) status: String,
 }
 
-pub(crate) struct RetentionSummary {
-    pub(crate) report: String,
-    pub(crate) mode: String,
-    pub(crate) candidate_count: usize,
-    pub(crate) deleted_count: usize,
-    pub(crate) kept_count: usize,
-    pub(crate) skipped_count: usize,
-}
-
 pub(crate) struct PromoteSummary {
     pub(crate) target: String,
-    pub(crate) archive: String,
     pub(crate) log: String,
-}
-
-#[derive(Serialize)]
-struct RetentionReport {
-    ok: bool,
-    generated_at: String,
-    mode: String,
-    retention_days: i64,
-    candidate_count: usize,
-    deleted_count: usize,
-    kept_count: usize,
-    skipped_count: usize,
-    records: Vec<RetentionRecord>,
-}
-
-#[derive(Serialize)]
-struct RetentionRecord {
-    action: String,
-    path: String,
-    archived_at: String,
-    age_days: Option<i64>,
-    reason: String,
 }
 
 pub(crate) fn normalize(vault: &Path, target: &Path, check: bool) -> Result<NormalizeSummary> {
@@ -84,6 +51,8 @@ pub(crate) fn normalize(vault: &Path, target: &Path, check: bool) -> Result<Norm
     let tags = parsed.array_block("tags");
     let source_note = parsed.scalar("source_note");
     let last_edit_summary = parsed.scalar("last_edit_summary");
+    let approved_by = parsed.scalar("approved_by");
+    let modified_by = parsed.scalar("modified_by");
     let promoted_at = parsed.scalar("promoted_at");
     let version = parsed.scalar("version").unwrap_or_else(|| "1".to_string());
     let created = parsed.scalar("created").unwrap_or_else(|| today.clone());
@@ -121,6 +90,12 @@ pub(crate) fn normalize(vault: &Path, target: &Path, check: bool) -> Result<Norm
     }
     push_quoted(&mut output, "created", &created);
     push_quoted(&mut output, "modified", &modified);
+    if let Some(approved_by) = approved_by.as_deref().filter(|value| !value.is_empty()) {
+        push_quoted(&mut output, "approved_by", approved_by);
+    }
+    if let Some(modified_by) = modified_by.as_deref().filter(|value| !value.is_empty()) {
+        push_quoted(&mut output, "modified_by", modified_by);
+    }
     if let Some(promoted_at) = promoted_at.as_deref().filter(|value| !value.is_empty()) {
         push_quoted(&mut output, "promoted_at", promoted_at);
     }
@@ -138,117 +113,12 @@ pub(crate) fn normalize(vault: &Path, target: &Path, check: bool) -> Result<Norm
     })
 }
 
-pub(crate) fn retention(vault: &Path, apply: bool) -> Result<RetentionSummary> {
-    let days = config::retention_archived_drafts_days(vault)?;
-    let archive_root = vault.join("1_draft/_archived");
-    let report_dir = vault.join("3_intelligence/report/maintenance");
-    fs::create_dir_all(&report_dir)?;
-    fs::create_dir_all(vault.join("0_core/tmp"))?;
-
-    let now = Utc::now();
-    let mut records = Vec::new();
-    if archive_root.is_dir() {
-        let mut files = Vec::new();
-        collect_markdown_files(&archive_root, &mut files)?;
-        files.sort();
-        for file in files {
-            let abs = absolute_path(&file)?;
-            let rel = rel_path(&abs, vault).unwrap_or_else(|| abs.to_string_lossy().to_string());
-            let content = fs::read_to_string(&abs)?;
-            let parsed = ParsedMarkdown::parse(&content);
-            let archived_at = parsed.scalar("archived_at").unwrap_or_default();
-            if archived_at.is_empty() {
-                records.push(retention_record(
-                    "skipped",
-                    rel,
-                    "",
-                    None,
-                    "missing_archived_at",
-                ));
-                continue;
-            }
-
-            let Ok(archived_at_time) = DateTime::parse_from_rfc3339(&archived_at) else {
-                records.push(retention_record(
-                    "skipped",
-                    rel,
-                    &archived_at,
-                    None,
-                    "invalid_archived_at",
-                ));
-                continue;
-            };
-            let age_days = (now.timestamp() - archived_at_time.timestamp()) / 86_400;
-            if age_days < days {
-                records.push(retention_record(
-                    "kept",
-                    rel,
-                    &archived_at,
-                    Some(age_days),
-                    "within_retention",
-                ));
-                continue;
-            }
-
-            if apply {
-                fs::remove_file(&abs)?;
-                records.push(retention_record(
-                    "deleted",
-                    rel,
-                    &archived_at,
-                    Some(age_days),
-                    "expired",
-                ));
-            } else {
-                records.push(retention_record(
-                    "candidate",
-                    rel,
-                    &archived_at,
-                    Some(age_days),
-                    "expired",
-                ));
-            }
-        }
-    }
-
-    let candidate_count = count_action(&records, "candidate");
-    let deleted_count = count_action(&records, "deleted");
-    let kept_count = count_action(&records, "kept");
-    let skipped_count = count_action(&records, "skipped");
-    let mode = if apply { "apply" } else { "report" }.to_string();
-    let generated_at = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
-    let today = now.format("%Y-%m-%d").to_string();
-    let report_abs = report_dir.join(format!("retention-{today}.json"));
-    let report = RetentionReport {
-        ok: true,
-        generated_at,
-        mode: mode.clone(),
-        retention_days: days,
-        candidate_count,
-        deleted_count,
-        kept_count,
-        skipped_count,
-        records,
-    };
-    fs::write(&report_abs, serde_json::to_string_pretty(&report)?)?;
-    let report_rel =
-        rel_path(&report_abs, vault).unwrap_or_else(|| report_abs.to_string_lossy().to_string());
-
-    Ok(RetentionSummary {
-        report: report_rel,
-        mode,
-        candidate_count,
-        deleted_count,
-        kept_count,
-        skipped_count,
-    })
-}
-
 pub(crate) fn promote(
     vault: &Path,
     source: &Path,
     to: &str,
     new_slug: Option<&str>,
+    approved_by: &str,
 ) -> Result<PromoteSummary> {
     if !source.is_file() {
         return Err(format!("source not found: {}", source.to_string_lossy()).into());
@@ -266,9 +136,6 @@ pub(crate) fn promote(
         return Err(format!("source must be under 1_draft: {source_rel}").into());
     }
     let draft_subpath = source_rel.trim_start_matches("1_draft/");
-    if draft_subpath.starts_with("_archived/") {
-        return Err(format!("archived drafts cannot be promoted: {source_rel}").into());
-    }
 
     let content = fs::read_to_string(&source_abs)?;
     let parsed = ParsedMarkdown::parse(&content);
@@ -306,14 +173,9 @@ pub(crate) fn promote(
         .next()
         .ok_or("invalid promotion target")?;
     let target_rel = format!("{target_room}/{draft_base}");
-    let archive_rel = format!("1_draft/_archived/{draft_subpath}");
     let target_abs = vault.join(&target_rel);
-    let archive_abs = vault.join(&archive_rel);
     if target_abs.exists() {
         return Err(format!("target exists; use --new-slug: {target_rel}").into());
-    }
-    if archive_abs.exists() {
-        return Err(format!("archive target exists: {archive_rel}").into());
     }
 
     let promoted_id = parsed.scalar("id").unwrap_or_else(|| make_id(&target_rel));
@@ -327,38 +189,17 @@ pub(crate) fn promote(
         target_strata,
         "verified",
         &target_rel,
-        &archive_rel,
-        None,
+        approved_by,
         now,
     )?;
-    let archived = build_promote_candidate(
-        &parsed,
-        &source_abs,
-        &description,
-        "1_draft",
-        "archived",
-        &archive_rel,
-        &archive_rel,
-        Some(&source_rel),
-        now,
-    )?;
-
     validate_candidate(
         &promoted,
         target_strata,
         "promoted candidate failed normalization",
     )?;
-    validate_candidate(
-        &archived,
-        "1_draft",
-        "archived candidate failed normalization",
-    )?;
-
     fs::create_dir_all(target_abs.parent().ok_or("invalid target path")?)?;
-    fs::create_dir_all(archive_abs.parent().ok_or("invalid archive path")?)?;
     fs::create_dir_all(vault.join("3_intelligence/report/operation"))?;
     fs::write(&target_abs, promoted)?;
-    fs::write(&archive_abs, archived)?;
     fs::remove_file(&source_abs)?;
 
     let log_rel = format!(
@@ -370,13 +211,11 @@ pub(crate) fn promote(
         "ok": true,
         "source": source_rel,
         "target": target_rel,
-        "archive": archive_rel,
     });
     fs::write(&log_abs, serde_json::to_string(&log)?)?;
 
     Ok(PromoteSummary {
         target: log["target"].as_str().unwrap_or_default().to_string(),
-        archive: log["archive"].as_str().unwrap_or_default().to_string(),
         log: log_rel,
     })
 }
@@ -435,14 +274,10 @@ fn build_promote_candidate(
     strata: &str,
     status: &str,
     rel_for_id: &str,
-    archive_rel: &str,
-    archived_from: Option<&str>,
+    approved_by: &str,
     now: chrono::DateTime<Utc>,
 ) -> Result<String> {
-    let mut id = parsed.scalar("id").unwrap_or_else(|| make_id(rel_for_id));
-    if archived_from.is_some() {
-        id.push_str("_archived");
-    }
+    let id = parsed.scalar("id").unwrap_or_else(|| make_id(rel_for_id));
     let title = parsed
         .scalar("title")
         .filter(|value| !value.is_empty())
@@ -472,12 +307,11 @@ fn build_promote_candidate(
     push_quoted(&mut output, "status", status);
     push_block_or_key(&mut output, tags.as_deref(), "tags");
     if matches!(strata, "2_knowledge" | "3_intelligence") {
-        output.push_str("sources:\n");
-        output.push_str(&format!("  - \"{}\"\n", yaml_quote_escape(archive_rel)));
+        push_block_or_key(&mut output, sources.as_deref(), "sources");
         if let Some(source_note) = source_note.as_deref().filter(|value| !value.is_empty()) {
             push_quoted(&mut output, "source_note", source_note);
         } else {
-            push_quoted(&mut output, "source_note", "Promoted from archived draft.");
+            push_quoted(&mut output, "source_note", "Promoted from draft.");
         }
         push_quoted(&mut output, "promoted_at", &now_rfc3339);
     } else if let Some(sources) = sources {
@@ -494,20 +328,13 @@ fn build_promote_candidate(
         push_quoted(&mut output, "last_edit_summary", summary);
     }
     push_quoted(&mut output, "created", &created);
+    push_quoted(&mut output, "approved_by", approved_by);
+    push_quoted(&mut output, "modified_by", approved_by);
     push_quoted(
         &mut output,
         "modified",
         &Utc::now().format("%Y-%m-%d").to_string(),
     );
-    if let Some(archived_from) = archived_from {
-        push_quoted(&mut output, "archived_at", &now_rfc3339);
-        push_quoted(
-            &mut output,
-            "archived_reason",
-            &format!("Promoted to {rel_for_id}."),
-        );
-        push_quoted(&mut output, "archived_from", archived_from);
-    }
     output.push_str("---\n");
     output.push_str(&parsed.body);
 
@@ -523,44 +350,6 @@ fn validate_candidate(content: &str, strata: &str, message: &str) -> Result<()> 
         && parsed.scalar("description").unwrap_or_default().is_empty()
     {
         return Err(message.to_string().into());
-    }
-    Ok(())
-}
-
-fn retention_record(
-    action: &str,
-    path: String,
-    archived_at: &str,
-    age_days: Option<i64>,
-    reason: &str,
-) -> RetentionRecord {
-    RetentionRecord {
-        action: action.to_string(),
-        path,
-        archived_at: archived_at.to_string(),
-        age_days,
-        reason: reason.to_string(),
-    }
-}
-
-fn count_action(records: &[RetentionRecord], action: &str) -> usize {
-    records
-        .iter()
-        .filter(|record| record.action == action)
-        .count()
-}
-
-fn collect_markdown_files(dir: &Path, files: &mut Vec<std::path::PathBuf>) -> Result<()> {
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        let file_type = entry.file_type()?;
-        if file_type.is_dir() {
-            collect_markdown_files(&path, files)?;
-        } else if file_type.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("md")
-        {
-            files.push(path);
-        }
     }
     Ok(())
 }
@@ -673,11 +462,7 @@ fn detect_strata(rel: &str) -> Option<&'static str> {
     }
 }
 
-fn default_status(strata: &str, rel: &str) -> &'static str {
-    if rel.contains("/_archived/") || rel.contains("_archived/") {
-        return "archived";
-    }
-
+fn default_status(strata: &str, _rel: &str) -> &'static str {
     match strata {
         "0_core" => "core",
         "1_draft" => "pending",

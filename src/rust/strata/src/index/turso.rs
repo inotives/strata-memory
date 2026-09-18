@@ -1,7 +1,7 @@
 use crate::cli::{IndexMode, SearchArgs};
 use crate::config;
 use crate::index::model::{
-    collect_markdown_files, embed_text, posix_cksum_hash, read_document,
+    collect_markdown_files, embed_text, fts_query, posix_cksum_hash, read_document,
     validate_builtin_embedding_config, IndexBackend, SearchResult, SemanticCandidate,
     SemanticRefreshSummary,
 };
@@ -143,7 +143,7 @@ pub(super) fn search(vault: &Path, args: &SearchArgs, json: bool) -> Result<()> 
     let results = block_on(async {
         let db = open_database(vault).await?;
         let conn = db.connect()?;
-        fts_results(&conn, &args.query, args.limit, args.include_archived).await
+        fts_results(&conn, &args.query, args.limit).await
     })?;
     print_search_results(
         args,
@@ -166,20 +166,13 @@ fn search_hybrid(
     let fts = block_on(async {
         let db = open_database(vault).await?;
         let conn = db.connect()?;
-        fts_results(
-            &conn,
-            &args.query,
-            args.limit.saturating_mul(4).max(50),
-            args.include_archived,
-        )
-        .await
+        fts_results(&conn, &args.query, args.limit.saturating_mul(4).max(50)).await
     })?;
     let semantic_results = exact_semantic_candidates(
         vault,
         semantic,
         &args.query,
         args.limit.saturating_mul(4).max(50),
-        args.include_archived,
     )?;
 
     let mut merged = HashMap::new();
@@ -485,17 +478,11 @@ fn exact_semantic_candidates(
     semantic: &config::Semantic,
     query: &str,
     limit: usize,
-    include_archived: bool,
 ) -> Result<Vec<SemanticCandidate>> {
     let query_vector = vector_text(&embed_text(query, semantic.embedding_dim as usize));
     block_on(async {
         let db = open_database(vault).await?;
         let conn = db.connect()?;
-        let archived_filter = if include_archived {
-            ""
-        } else {
-            " AND memory_index.status <> 'archived'"
-        };
         let sql = format!(
             "SELECT semantic_embeddings.path,
                     ifnull(memory_index.title,''),
@@ -513,7 +500,7 @@ fn exact_semantic_candidates(
                ON sections.path = semantic_embeddings.path
               AND sections.start_line = semantic_embeddings.section_start_line
              WHERE semantic_embeddings.provider = ?2
-               AND semantic_embeddings.model = ?3{archived_filter}
+               AND semantic_embeddings.model = ?3
              ORDER BY vector_distance_cos(semantic_embeddings.vector, vector32(?1))
              LIMIT ?4"
         );
@@ -667,21 +654,12 @@ async fn remove_stale(conn: &Connection, seen: &HashSet<String>) -> Result<()> {
     Ok(())
 }
 
-async fn fts_results(
-    conn: &Connection,
-    query: &str,
-    limit: usize,
-    include_archived: bool,
-) -> Result<Vec<SearchResult>> {
-    let archived_filter = if include_archived {
-        ""
-    } else {
-        " AND status <> 'archived'"
-    };
+async fn fts_results(conn: &Connection, query: &str, limit: usize) -> Result<Vec<SearchResult>> {
+    let query = fts_query(query);
     let sql = format!(
         "SELECT path, ifnull(title,''), status, ifnull(description,''), content
          FROM memory_index
-         WHERE (title, description, tags, content) MATCH ?1{archived_filter}
+         WHERE (title, description, tags, content) MATCH ?1
          LIMIT ?2"
     );
     let mut rows = conn.query(sql, (query, limit as i64)).await?;

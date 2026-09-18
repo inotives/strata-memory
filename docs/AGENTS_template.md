@@ -68,10 +68,9 @@ skill/
 agent/
 workflow/
 session/
-_archived/
 ```
 
-Promotion archives the source draft under `_archived/`. Archived drafts are searchable only when explicitly included.
+Promotion creates the durable target and permanently removes the source draft. Legacy `_archived/` content is ignored.
 
 ## `2_knowledge/`
 
@@ -85,7 +84,6 @@ entity/
 research/
 note/
 preference/
-_archived/
 ```
 
 Room structure is profile-driven. Entity subtrees are usually recursive, for example:
@@ -107,7 +105,6 @@ skill/
 agent/
 workflow/
 report/
-_archived/
 ```
 
 - `skill/`: reusable capabilities with `SKILL.md`, optional scripts/resources/tests.
@@ -124,7 +121,6 @@ Promotion is file-first and index-second:
 ```text
 1_draft/research/foo.md
   -> 2_knowledge/research/foo.md
-  -> 1_draft/_archived/research/foo.md
 ```
 
 Rules:
@@ -132,7 +128,9 @@ Rules:
 - Validate frontmatter, tags, rooms, links, and target path first.
 - Use vault-local temp files under `0_core/tmp/`.
 - Never overwrite an existing target by default.
-- Archive the draft as provenance.
+- Pass `--approved-by ACTOR`; promotion sets `approved_by` and `modified_by`.
+- Directly edit existing durable documents, preserving `id` and updating `version`, `modified`, `modified_by`, and `last_edit_summary`.
+- Permanently delete unwanted files, then run `strata refresh`.
 - Re-index affected files after filesystem writes.
 - Treat SQLite as recoverable cache.
 

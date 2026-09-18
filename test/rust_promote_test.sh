@@ -55,35 +55,43 @@ created: "2026-06-06"
 Draft body.
 EOF
 
-out=$("$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/sqlite-fts.md" --to 2_knowledge --json)
+out=$("$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/sqlite-fts.md" --to 2_knowledge --approved-by "reviewer" --json)
 case "$out" in
     *'"ok":true'*) ;;
     *) fail "expected json promote success: $out" ;;
 esac
 
 target="${VAULT}/2_knowledge/research/sqlite-fts.md"
-archive="${VAULT}/1_draft/_archived/research/sqlite-fts.md"
 assert_file "$target"
-assert_file "$archive"
 assert_missing "${VAULT}/1_draft/research/sqlite-fts.md"
 assert_contains "$target" 'strata: "2_knowledge"'
 assert_contains "$target" 'status: "verified"'
-assert_contains "$target" 'sources:'
-assert_contains "$target" '1_draft/_archived/research/sqlite-fts.md'
 assert_contains "$target" 'promoted_at: "'
-assert_contains "$archive" 'status: "archived"'
-assert_contains "$archive" 'archived_from: "1_draft/research/sqlite-fts.md"'
+assert_contains "$target" 'approved_by: "reviewer"'
+assert_contains "$target" 'modified_by: "reviewer"'
 
 DB="${VAULT}/0_core/db/strata.db"
 target_index=$(/usr/bin/sqlite3 "$DB" "SELECT count(*) FROM memory_index WHERE path = '2_knowledge/research/sqlite-fts.md' AND status = 'verified';")
 assert_eq "$target_index" "1" "target indexed"
-archive_index=$(/usr/bin/sqlite3 "$DB" "SELECT count(*) FROM memory_index WHERE path = '1_draft/_archived/research/sqlite-fts.md' AND status = 'archived';")
-assert_eq "$archive_index" "1" "archive indexed"
 "$STRATA_BIN" refresh --vault "$VAULT" >/dev/null
 target_id=$(/usr/bin/sqlite3 "$DB" "SELECT id FROM memory_index WHERE path = '2_knowledge/research/sqlite-fts.md';")
-archive_id=$(/usr/bin/sqlite3 "$DB" "SELECT id FROM memory_index WHERE path = '1_draft/_archived/research/sqlite-fts.md';")
 assert_eq "$target_id" "mem_promote_001" "target logical ID"
-assert_eq "$archive_id" "mem_promote_001_archived" "archive index ID"
+
+cat > "${VAULT}/1_draft/research/missing-approver.md" <<'EOF'
+---
+title: "Missing Approver"
+description: "Must not promote without approval."
+status: "pending"
+tags:
+  - research
+---
+# Missing Approver
+EOF
+if "$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/missing-approver.md" --to 2_knowledge >/dev/null 2>&1; then
+    fail "expected missing approver promotion to fail"
+fi
+assert_file "${VAULT}/1_draft/research/missing-approver.md"
+assert_missing "${VAULT}/2_knowledge/research/missing-approver.md"
 
 cat > "${VAULT}/1_draft/research/duplicate-id.md" <<'EOF'
 ---
@@ -98,7 +106,7 @@ tags:
 EOF
 
 DUPLICATE_JSON=$(mktemp "${TMP_ROOT}/rust-promote-duplicate-XXXXXXXX")
-if "$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/duplicate-id.md" --to 2_knowledge --json > "$DUPLICATE_JSON" 2>/dev/null; then
+if "$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/duplicate-id.md" --to 2_knowledge --approved-by "reviewer" --json > "$DUPLICATE_JSON" 2>/dev/null; then
     fail "expected duplicate document ID promotion to fail"
 fi
 assert_contains "$DUPLICATE_JSON" '"ok":false'
@@ -106,7 +114,6 @@ assert_contains "$DUPLICATE_JSON" '"error":"duplicate_document_id"'
 rm -f "$DUPLICATE_JSON"
 assert_file "${VAULT}/1_draft/research/duplicate-id.md"
 assert_missing "${VAULT}/2_knowledge/research/duplicate-id.md"
-assert_missing "${VAULT}/1_draft/_archived/research/duplicate-id.md"
 
 cat > "${VAULT}/2_knowledge/research/conflict.md" <<'EOF'
 ---
@@ -132,14 +139,14 @@ tags:
 # Duplicate
 EOF
 
-if "$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/conflict.md" --to 2_knowledge >/dev/null 2>&1; then
+if "$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/conflict.md" --to 2_knowledge --approved-by "reviewer" >/dev/null 2>&1; then
     fail "expected overwrite promotion to fail"
 fi
 assert_file "${VAULT}/1_draft/research/conflict.md"
 
-"$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/conflict.md" --to 2_knowledge --new-slug duplicate-note >/dev/null
+"$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/conflict.md" --to 2_knowledge --approved-by "reviewer" --new-slug duplicate-note >/dev/null
 assert_file "${VAULT}/2_knowledge/research/duplicate-note.md"
-assert_file "${VAULT}/1_draft/_archived/research/conflict.md"
+assert_missing "${VAULT}/1_draft/research/conflict.md"
 
 mkdir -p "${VAULT}/1_draft/trading"
 cat > "${VAULT}/1_draft/trading/website-source.md" <<'EOF'
@@ -153,13 +160,13 @@ tags:
 # Website Source
 EOF
 
-out=$("$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/trading/website-source.md" --to 2_knowledge/entity/website --json)
+out=$("$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/trading/website-source.md" --to 2_knowledge/entity/website --approved-by "reviewer" --json)
 case "$out" in
     *'"target":"2_knowledge/entity/website/website-source.md"'*) ;;
     *) fail "expected concrete room target: $out" ;;
 esac
 assert_file "${VAULT}/2_knowledge/entity/website/website-source.md"
-assert_file "${VAULT}/1_draft/_archived/trading/website-source.md"
+assert_missing "${VAULT}/1_draft/trading/website-source.md"
 assert_contains "${VAULT}/2_knowledge/entity/website/website-source.md" 'strata: "2_knowledge"'
 
 cat > "${VAULT}/1_draft/research/intelligence-skill.md" <<'EOF'
@@ -173,13 +180,13 @@ tags:
 # Intelligence Skill
 EOF
 
-out=$("$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/intelligence-skill.md" --to 3_intelligence/skill/trading --new-slug price-fetch-note --json)
+out=$("$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/intelligence-skill.md" --to 3_intelligence/skill/trading --approved-by "reviewer" --new-slug price-fetch-note --json)
 case "$out" in
     *'"target":"3_intelligence/skill/trading/price-fetch-note.md"'*) ;;
     *) fail "expected concrete intelligence target: $out" ;;
 esac
 assert_file "${VAULT}/3_intelligence/skill/trading/price-fetch-note.md"
-assert_file "${VAULT}/1_draft/_archived/research/intelligence-skill.md"
+assert_missing "${VAULT}/1_draft/research/intelligence-skill.md"
 assert_contains "${VAULT}/3_intelligence/skill/trading/price-fetch-note.md" 'strata: "3_intelligence"'
 
 cat > "${VAULT}/1_draft/research/unsafe.md" <<'EOF'
@@ -193,7 +200,7 @@ tags:
 # Unsafe
 EOF
 
-if "$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/unsafe.md" --to 2_knowledge/../3_intelligence >/dev/null 2>&1; then
+if "$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/unsafe.md" --to 2_knowledge/../3_intelligence --approved-by "reviewer" >/dev/null 2>&1; then
     fail "expected unsafe promotion target to fail"
 fi
 assert_file "${VAULT}/1_draft/research/unsafe.md"

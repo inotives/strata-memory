@@ -27,7 +27,6 @@ pub(crate) enum Command {
     ConfigCompile,
     Normalize(NormalizeArgs),
     Promote(PromoteArgs),
-    Retention(RetentionArgs),
 }
 
 #[derive(Debug)]
@@ -40,7 +39,6 @@ pub(crate) enum IndexMode {
 pub(crate) struct SearchArgs {
     pub(crate) query: String,
     pub(crate) limit: usize,
-    pub(crate) include_archived: bool,
     pub(crate) paths_only: bool,
     pub(crate) refresh: bool,
     pub(crate) hybrid: bool,
@@ -53,15 +51,11 @@ pub(crate) struct NormalizeArgs {
 }
 
 #[derive(Debug)]
-pub(crate) struct RetentionArgs {
-    pub(crate) apply: bool,
-}
-
-#[derive(Debug)]
 pub(crate) struct PromoteArgs {
     pub(crate) source: PathBuf,
     pub(crate) to: String,
     pub(crate) new_slug: Option<String>,
+    pub(crate) approved_by: String,
 }
 
 pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
@@ -135,7 +129,6 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
         "search" => {
             let mut query: Option<String> = None;
             let mut limit = 10;
-            let mut include_archived = false;
             let mut paths_only = false;
             let mut refresh = false;
             let mut hybrid = false;
@@ -155,7 +148,6 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
                             .parse::<usize>()
                             .map_err(|_| "limit must be a positive integer")?;
                     }
-                    "--include-archived" => include_archived = true,
                     "--paths-only" => paths_only = true,
                     "--refresh" => refresh = true,
                     "--hybrid" => hybrid = true,
@@ -172,7 +164,6 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
             Command::Search(SearchArgs {
                 query: query.ok_or("missing search query")?,
                 limit,
-                include_archived,
                 paths_only,
                 refresh,
                 hybrid,
@@ -331,25 +322,11 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
                 check,
             })
         }
-        "retention" => {
-            let mut apply = false;
-            while let Some(arg) = iter.next() {
-                match arg.as_str() {
-                    "--vault" => {
-                        let value = iter.next().ok_or("--vault requires PATH")?;
-                        vault = PathBuf::from(value);
-                    }
-                    "--apply" => apply = true,
-                    "--json" => json = true,
-                    other => return Err(format!("unknown argument: {other}").into()),
-                }
-            }
-            Command::Retention(RetentionArgs { apply })
-        }
         "promote" => {
             let mut source: Option<PathBuf> = None;
             let mut to: Option<String> = None;
             let mut new_slug: Option<String> = None;
+            let mut approved_by: Option<String> = None;
             while let Some(arg) = iter.next() {
                 match arg.as_str() {
                     "--source" => {
@@ -361,6 +338,9 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
                     }
                     "--new-slug" => {
                         new_slug = Some(iter.next().ok_or("--new-slug requires SLUG")?);
+                    }
+                    "--approved-by" => {
+                        approved_by = Some(iter.next().ok_or("--approved-by requires ACTOR")?);
                     }
                     "--vault" => {
                         let value = iter.next().ok_or("--vault requires PATH")?;
@@ -374,6 +354,9 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
                 source: source.ok_or("missing --source")?,
                 to: to.ok_or("missing --to")?,
                 new_slug,
+                approved_by: approved_by
+                    .filter(|actor| !actor.trim().is_empty())
+                    .ok_or("missing --approved-by")?,
             })
         }
         _ => return Err(format!("unknown command: {command}").into()),
@@ -390,7 +373,7 @@ fn print_usage() {
     println!("Usage: strata index [--target FILE | --full] [--vault PATH] [--json]");
     println!("       strata refresh [--vault PATH] [--json]");
     println!("       strata agents-generate [--vault PATH] [--json]");
-    println!("       strata search --query TEXT [--vault PATH] [--limit N] [--include-archived] [--paths-only] [--refresh] [--hybrid] [--json]");
+    println!("       strata search --query TEXT [--vault PATH] [--limit N] [--paths-only] [--refresh] [--hybrid] [--json]");
     println!("       strata semantic-refresh [--vault PATH] [--json]");
     println!("       strata semantic-status [--vault PATH] [--json]");
     println!("       strata link-review [--vault PATH] [--json]");
@@ -402,8 +385,7 @@ fn print_usage() {
     println!("       strata init [--vault PATH] [--json]");
     println!("       strata config-compile [--vault PATH] [--json]");
     println!("       strata normalize --target FILE [--vault PATH] [--check] [--json]");
-    println!("       strata promote --source FILE --to 2_knowledge[/ROOM]|3_intelligence[/ROOM] [--new-slug SLUG] [--vault PATH] [--json]");
-    println!("       strata retention [--vault PATH] [--apply] [--json]");
+    println!("       strata promote --source FILE --to 2_knowledge[/ROOM]|3_intelligence[/ROOM] --approved-by ACTOR [--new-slug SLUG] [--vault PATH] [--json]");
 }
 
 fn home_dir() -> PathBuf {
