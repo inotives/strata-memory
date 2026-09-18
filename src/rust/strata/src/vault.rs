@@ -8,6 +8,10 @@ const BOOTSTRAP_DEPENDENCIES: &[&str] = &[
 ];
 
 const VAULT_DIRS: &[&str] = &[
+    "0_resource/images",
+    "0_resource/scripts",
+    "0_resource/data",
+    "0_resource/other",
     "0_core/config",
     "0_core/cache",
     "0_core/db/sqlite/migrations",

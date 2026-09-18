@@ -35,6 +35,10 @@ assert_single_line() {
 assert_dir "${VAULT}/0_core/script/lib"
 assert_dir "${VAULT}/0_core/bin"
 assert_dir "${VAULT}/0_core/template_override"
+assert_dir "${VAULT}/0_resource/images"
+assert_dir "${VAULT}/0_resource/scripts"
+assert_dir "${VAULT}/0_resource/data"
+assert_dir "${VAULT}/0_resource/other"
 assert_dir "${VAULT}/1_draft/research"
 assert_dir "${VAULT}/2_knowledge/entity"
 assert_dir "${VAULT}/3_intelligence/workflow"
@@ -50,6 +54,7 @@ assert_file "${VAULT}/0_core/doc/commands.md"
 assert_file "${VAULT}/0_core/manifest.json"
 assert_file "${VAULT}/.gitignore"
 assert_file "${VAULT}/AGENTS.md"
+printf '%s\n' 'Ignored resource fixture.' > "${VAULT}/0_resource/other/ignored-resource.md"
 "${VAULT}/0_core/bin/strata" --help >/dev/null
 "${VAULT}/0_core/bin/strata" doctor --vault "$VAULT" >/dev/null
 "${VAULT}/0_core/bin/strata" search --query "example" --vault "$VAULT" >/dev/null
