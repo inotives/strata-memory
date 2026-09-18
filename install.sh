@@ -85,6 +85,10 @@ check_runtime_dependencies() {
 
 create_vault_dirs() {
     for rel in \
+        "0_resource/images" \
+        "0_resource/scripts" \
+        "0_resource/data" \
+        "0_resource/other" \
         "0_core/config" \
         "0_core/cache" \
         "0_core/db/sqlite/migrations" \
@@ -101,18 +105,15 @@ create_vault_dirs() {
         "1_draft/agent" \
         "1_draft/workflow" \
         "1_draft/session" \
-        "1_draft/_archived" \
         "2_knowledge/concept" \
         "2_knowledge/entity" \
         "2_knowledge/research" \
         "2_knowledge/note" \
         "2_knowledge/preference" \
-        "2_knowledge/_archived" \
         "3_intelligence/skill" \
         "3_intelligence/agent" \
         "3_intelligence/workflow" \
-        "3_intelligence/report" \
-        "3_intelligence/_archived"
+        "3_intelligence/report"
     do
         mkdir -p "${VAULT}/${rel}"
     done

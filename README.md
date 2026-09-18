@@ -45,6 +45,7 @@ By default, the private vault lives at:
 Strata uses a core-plus-three-tier lifecycle:
 
 ```text
+0_resource/      # non-indexed images, scripts, data, and other Markdown-linked assets
 0_core/          # installed engine kernel, Rust binary, wrappers, templates, config, cache, db
 1_draft/         # raw, unreviewed material
 2_knowledge/     # curated durable knowledge

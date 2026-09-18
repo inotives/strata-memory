@@ -8,6 +8,8 @@ Strata-Memory is a local-first three-tier memory wiki for agentic work. Numbered
 
 `0_core/` is not a tier. It holds the vault kernel: config, scripts, schema, templates, generated docs, cache, tests, and temp files.
 
+`0_resource/` is not a tier. It stores non-indexed Markdown-linked assets in `images/`, `scripts/`, `data/`, and `other/`. Use relative POSIX paths, do not add Strata frontmatter or promote resources, and do not execute stored scripts without the existing execution allowlist.
+
 **Main configuration:** `0_core/config/configs.yaml`
 
 ## Draft Research

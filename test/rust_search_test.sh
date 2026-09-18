@@ -32,6 +32,15 @@ assert_contains() {
 "${ROOT}/install.sh" --vault "$VAULT" >/dev/null
 
 mkdir -p "${VAULT}/2_knowledge/concept" "${VAULT}/1_draft/_archived/research"
+mkdir -p "${VAULT}/0_resource/images"
+
+cat > "${VAULT}/0_resource/images/ignored-resource.md" <<'EOF'
+---
+title: "Ignored Resource"
+description: "This resource must never be indexed."
+---
+# Ignored Resource
+EOF
 
 cat > "${VAULT}/2_knowledge/concept/alpha-title.md" <<'EOF'
 ---
@@ -90,6 +99,9 @@ default_results=$("$STRATA_BIN" search --vault "$VAULT" --query alpha --paths-on
 case "$default_results" in
     *"1_draft/_archived/research/archived-alpha.md"*) fail "archived result should be excluded by default" ;;
 esac
+
+resource_results=$("$STRATA_BIN" search --vault "$VAULT" --query "Ignored Resource" --paths-only --limit 10)
+assert_eq "$resource_results" "" "resources are not indexed"
 
 human=$("$STRATA_BIN" search --vault "$VAULT" --query alpha --limit 2)
 assert_contains "$human" "[alpha]" "snippet"
