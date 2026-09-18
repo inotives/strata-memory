@@ -799,7 +799,7 @@ mod tests {
         let semantic_summary = semantic_refresh_with(&vault, &semantic)?;
         assert_eq!(semantic_summary.descriptions, 2);
         assert_eq!(
-            exact_semantic_candidates(&vault, &semantic, "First concept", 10, false)?[0].path,
+            exact_semantic_candidates(&vault, &semantic, "First concept", 10)?[0].path,
             "2_knowledge/concept/alpha.md"
         );
 
@@ -849,7 +849,7 @@ mod tests {
         block_on(async {
             let db = open(vault).await?;
             let conn = db.connect()?;
-            Ok(fts_results(&conn, query, 10, false)
+            Ok(fts_results(&conn, query, 10)
                 .await?
                 .into_iter()
                 .map(|result| result.path)

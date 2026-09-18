@@ -29,6 +29,16 @@ fn run() -> Result<()> {
     let cli = cli::parse_args(env::args().skip(1).collect())?;
 
     match cli.command {
+        Command::Version => {
+            if cli.json {
+                println!(
+                    "{{\"ok\":true,\"name\":\"strata\",\"version\":\"{}\"}}",
+                    env!("CARGO_PKG_VERSION")
+                );
+            } else {
+                println!("strata {}", env!("CARGO_PKG_VERSION"));
+            }
+        }
         Command::AgentsGenerate => {
             let summary = agents::generate(&cli.vault)?;
             if cli.json {

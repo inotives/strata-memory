@@ -225,12 +225,15 @@ fi
 
 find "${CORE}/script" -type f -name '*.sh' -exec chmod +x {} \;
 [ ! -f "${CORE}/bin/strata" ] || chmod +x "${CORE}/bin/strata"
+installed_version=$("${CORE}/bin/strata" version)
+installed_version=${installed_version#strata }
 write_manifest
 run_bootstrap
 
 if [ "$json" = true ]; then
-    printf '{"ok":true,"vault":"%s","manifest":"%s"}\n' "$VAULT" "${CORE}/manifest.json"
+    printf '{"ok":true,"vault":"%s","manifest":"%s","version":"%s"}\n' "$VAULT" "${CORE}/manifest.json" "$installed_version"
 else
     printf 'Installed Strata-Memory into %s\n' "$VAULT"
+    printf 'Installed version: %s\n' "$installed_version"
     printf 'Managed manifest: %s\n' "${CORE}/manifest.json"
 fi
