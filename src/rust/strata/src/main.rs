@@ -186,6 +186,7 @@ fn run() -> Result<()> {
                 &args.source,
                 &args.to,
                 args.new_slug.as_deref(),
+                &args.approved_by,
             ) {
                 Ok(summary) => summary,
                 Err(err) => {
@@ -203,44 +204,14 @@ fn run() -> Result<()> {
                 &cli.vault,
                 IndexMode::Target(cli.vault.join(&summary.target)),
             )?;
-            index::refresh(
-                &cli.vault,
-                IndexMode::Target(cli.vault.join(&summary.archive)),
-            )?;
             if cli.json {
                 println!(
-                    "{{\"ok\":true,\"target\":\"{}\",\"archive\":\"{}\",\"log\":\"{}\"}}",
+                    "{{\"ok\":true,\"target\":\"{}\",\"log\":\"{}\"}}",
                     json_escape(&summary.target),
-                    json_escape(&summary.archive),
                     json_escape(&summary.log)
                 );
             } else {
                 println!("Promoted: {}", summary.target);
-                println!("Archived: {}", summary.archive);
-            }
-        }
-        Command::Retention(args) => {
-            let summary = lifecycle::retention(&cli.vault, args.apply)?;
-            if cli.json {
-                println!(
-                    "{{\"ok\":true,\"report\":\"{}\",\"mode\":\"{}\",\"candidate_count\":{},\"deleted_count\":{},\"kept_count\":{},\"skipped_count\":{}}}",
-                    json_escape(&summary.report),
-                    json_escape(&summary.mode),
-                    summary.candidate_count,
-                    summary.deleted_count,
-                    summary.kept_count,
-                    summary.skipped_count
-                );
-            } else {
-                println!(
-                    "Retention {} complete: {} candidate, {} deleted, {} kept, {} skipped",
-                    summary.mode,
-                    summary.candidate_count,
-                    summary.deleted_count,
-                    summary.kept_count,
-                    summary.skipped_count
-                );
-                println!("Report: {}", summary.report);
             }
         }
     }

@@ -2,8 +2,9 @@ use crate::cli::{IndexMode, SearchArgs};
 use crate::index;
 use crate::index::model::{
     builtin_embedding_supported, collect_markdown_files, cosine_similarity, decode_vector,
-    embed_text, encode_vector, posix_cksum_hash, read_document, validate_builtin_embedding_config,
-    IndexBackend, SearchResult, SemanticCandidate, SemanticRefreshSummary,
+    embed_text, encode_vector, fts_query, posix_cksum_hash, read_document,
+    validate_builtin_embedding_config, IndexBackend, SearchResult, SemanticCandidate,
+    SemanticRefreshSummary,
 };
 use crate::{config, json_escape, rel_path, Result};
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
@@ -108,6 +109,7 @@ pub(super) fn search(vault: &Path, args: &SearchArgs, json: bool) -> Result<()> 
     }
 
     let mode = "fts";
+    let fts_query = fts_query(&args.query);
     if args.hybrid {
         let warning = "semantic search unavailable; returned FTS5 results".to_string();
         if !json {
@@ -123,9 +125,6 @@ FROM memory_fts
 JOIN memory_index ON memory_fts.rowid = memory_index.rowid
 WHERE memory_fts MATCH ?1",
         );
-        if !args.include_archived {
-            sql.push_str(" AND memory_index.status <> 'archived'");
-        }
         sql.push_str(
             "
 ORDER BY bm25(memory_fts, 8.0, 4.0, 2.0, 1.0)
@@ -133,7 +132,7 @@ LIMIT ?2",
         );
 
         let mut stmt = conn.prepare(&sql)?;
-        let rows = stmt.query_map(params![args.query, args.limit as i64], |row| {
+        let rows = stmt.query_map(params![fts_query, args.limit as i64], |row| {
             row.get::<_, String>(0)
         })?;
         if json {
@@ -175,9 +174,6 @@ FROM memory_fts
 JOIN memory_index ON memory_fts.rowid = memory_index.rowid
 WHERE memory_fts MATCH ?1",
     );
-    if !args.include_archived {
-        sql.push_str(" AND memory_index.status <> 'archived'");
-    }
     sql.push_str(
         "
 ORDER BY bm25(memory_fts, 8.0, 4.0, 2.0, 1.0)
@@ -185,7 +181,7 @@ LIMIT ?2",
     );
 
     let mut stmt = conn.prepare(&sql)?;
-    let rows = stmt.query_map(params![args.query, args.limit as i64], |row| {
+    let rows = stmt.query_map(params![fts_query, args.limit as i64], |row| {
         Ok(SearchResult {
             path: row.get(0)?,
             title: row.get(1)?,
@@ -534,6 +530,7 @@ fn load_fts_results(
     args: &SearchArgs,
     limit: usize,
 ) -> Result<Vec<SearchResult>> {
+    let fts_query = fts_query(&args.query);
     let mut sql = String::from(
         "SELECT memory_index.path,
        ifnull(memory_index.title,''),
@@ -544,16 +541,13 @@ FROM memory_fts
 JOIN memory_index ON memory_fts.rowid = memory_index.rowid
 WHERE memory_fts MATCH ?1",
     );
-    if !args.include_archived {
-        sql.push_str(" AND memory_index.status <> 'archived'");
-    }
     sql.push_str(
         "
 ORDER BY bm25(memory_fts, 8.0, 4.0, 2.0, 1.0)
 LIMIT ?2",
     );
     let mut stmt = conn.prepare(&sql)?;
-    let rows = stmt.query_map(params![args.query, limit as i64], |row| {
+    let rows = stmt.query_map(params![fts_query, limit as i64], |row| {
         Ok(SearchResult {
             path: row.get(0)?,
             title: row.get(1)?,
@@ -576,7 +570,7 @@ fn load_semantic_candidates(
     args: &SearchArgs,
     query_vector: &[f32],
 ) -> Result<Vec<SemanticCandidate>> {
-    let mut sql = String::from(
+    let sql = String::from(
         "SELECT semantic_embeddings.path,
        ifnull(memory_index.title,''),
        memory_index.status,
@@ -595,9 +589,6 @@ LEFT JOIN sections
 WHERE semantic_embeddings.provider = ?1
   AND semantic_embeddings.model = ?2",
     );
-    if !args.include_archived {
-        sql.push_str(" AND memory_index.status <> 'archived'");
-    }
 
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map(params![semantic.provider, semantic.model], |row| {

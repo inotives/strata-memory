@@ -75,20 +75,16 @@ tags:
 # Turso Promotion
 EOF
 
-promote=$("$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/turso-promotion.md" --to 2_knowledge --json)
+promote=$("$STRATA_BIN" promote --vault "$VAULT" --source "${VAULT}/1_draft/research/turso-promotion.md" --to 2_knowledge --approved-by "reviewer" --json)
 case "$promote" in
     *'"ok":true'*) ;;
     *) fail "expected Turso promotion success: $promote" ;;
 esac
 "$STRATA_BIN" refresh --vault "$VAULT" >/dev/null
-archived_paths=$("$STRATA_BIN" search --vault "$VAULT" --query "Turso Promotion" --include-archived --paths-only)
-case "$archived_paths" in
+promoted_paths=$("$STRATA_BIN" search --vault "$VAULT" --query "Turso Promotion" --paths-only)
+case "$promoted_paths" in
     *'2_knowledge/research/turso-promotion.md'*) ;;
-    *) fail "expected promoted Turso path: $archived_paths" ;;
-esac
-case "$archived_paths" in
-    *'1_draft/_archived/research/turso-promotion.md'*) ;;
-    *) fail "expected archived Turso path: $archived_paths" ;;
+    *) fail "expected promoted Turso path: $promoted_paths" ;;
 esac
 
 sed \

@@ -134,19 +134,18 @@ require manually copying a binary.
 | `strata config-compile --vault PATH [--json]` | Validate config and write `0_core/cache/config.compiled.json`. |
 | `strata agents-generate --vault PATH [--json]` | Generate vault `AGENTS.md` while preserving manual sections. |
 | `strata index [--target FILE \| --full] --vault PATH [--json]` | Index one file or the full vault. |
-| `strata search --query TEXT --vault PATH [--limit N] [--include-archived] [--paths-only] [--hybrid] [--json]` | Search indexed memory. |
+| `strata search --query TEXT --vault PATH [--limit N] [--paths-only] [--hybrid] [--json]` | Search indexed memory. |
 | `strata semantic-refresh --vault PATH [--json]` | Rebuild local semantic embeddings. |
 | `strata semantic-status --vault PATH [--json]` | Report semantic search readiness. |
 | `strata link-review --vault PATH [--json]` | Review local Markdown links. Broken durable links are blocking errors. |
 | `strata normalize --target FILE --vault PATH [--check] [--json]` | Normalize constrained Markdown frontmatter. |
-| `strata promote --source FILE --to 2_knowledge[/ROOM]\|3_intelligence[/ROOM] [--new-slug SLUG] --vault PATH [--json]` | Promote a draft into a durable tier or concrete room and archive the original. |
-| `strata retention --vault PATH [--apply] [--json]` | Report or delete archived drafts past retention policy. |
+| `strata promote --source FILE --to 2_knowledge[/ROOM]\|3_intelligence[/ROOM] --approved-by ACTOR [--new-slug SLUG] --vault PATH [--json]` | Promote a new draft into a durable tier or concrete room and remove the original. |
 | `strata doctor --vault PATH [--json]` | Check vault health without mutating files. |
 | `strata tag-review --vault PATH [--json]` | Review frontmatter tags against allowed tags. |
 | `strata room-review --vault PATH [--json]` | Report files outside registered room patterns. |
 | `strata privacy-review --vault PATH [--json]` | Report local-path and privacy warnings. |
 
-`strata promote --to 2_knowledge` and `--to 3_intelligence` preserve the draft subfolder. For example, `1_draft/research/foo.md` promotes to `2_knowledge/research/foo.md`. Passing a concrete room such as `--to 2_knowledge/entity/website` promotes directly into that room.
+`strata promote --to 2_knowledge` and `--to 3_intelligence` preserve the draft subfolder. For example, `1_draft/research/foo.md` promotes to `2_knowledge/research/foo.md`. Pass `--approved-by ACTOR`; the draft is then removed. Edit an existing durable document directly, preserve its `id`, increment `version`, and update `modified`, `modified_by`, and `last_edit_summary`. Permanently delete unwanted files and run `strata refresh` afterward. Passing a concrete room such as `--to 2_knowledge/entity/website` promotes directly into that room.
 
 Full indexing reports progress on stderr when run interactively. For non-interactive runs, set `STRATA_INDEX_PROGRESS_EVERY=N`, or `0` to disable progress.
 

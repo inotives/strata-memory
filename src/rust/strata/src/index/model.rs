@@ -267,6 +267,10 @@ pub(crate) fn json_array(values: &[String]) -> String {
     format!("[{body}]")
 }
 
+pub(crate) fn fts_query(query: &str) -> String {
+    format!("\"{}\"", query.replace('"', "\"\""))
+}
+
 pub(crate) fn extract_links(content: &str) -> Vec<Link> {
     let mut links = Vec::new();
     for (line_idx, line) in content.lines().enumerate() {
@@ -364,13 +368,10 @@ pub(crate) fn is_excluded_path(rel: &str) -> bool {
         || rel.starts_with("0_core/tmp/")
         || rel.starts_with("0_core/test/tmp/")
         || rel.starts_with("0_core/db/")
+        || rel.contains("/_archived/")
 }
 
-pub(crate) fn default_status(strata: &str, rel: &str) -> &'static str {
-    if rel.contains("/_archived/") || rel.contains("_archived/") {
-        return "archived";
-    }
-
+pub(crate) fn default_status(strata: &str, _rel: &str) -> &'static str {
     match strata {
         "0_core" => "core",
         "1_draft" => "pending",
@@ -380,10 +381,7 @@ pub(crate) fn default_status(strata: &str, rel: &str) -> &'static str {
 }
 
 pub(crate) fn valid_status(status: &str) -> bool {
-    matches!(
-        status,
-        "pending" | "verified" | "archived" | "generated" | "core"
-    )
+    matches!(status, "pending" | "verified" | "generated" | "core")
 }
 
 pub(crate) fn make_id(rel: &str) -> String {

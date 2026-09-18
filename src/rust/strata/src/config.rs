@@ -12,7 +12,6 @@ struct Config {
     profile: String,
     #[serde(default)]
     index: Index,
-    retention: Retention,
     #[serde(default)]
     semantic: Semantic,
     tags: Tags,
@@ -24,12 +23,6 @@ struct Config {
 struct Index {
     #[serde(default)]
     backend: IndexBackend,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct Retention {
-    archived_drafts_days: i64,
-    default_mode: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -97,18 +90,6 @@ pub(crate) fn profile_tier2_rooms(vault: &Path) -> Result<(String, Vec<String>)>
         .unwrap_or_default();
 
     Ok((profile, rooms))
-}
-
-pub(crate) fn retention_archived_drafts_days(vault: &Path) -> Result<i64> {
-    let config = read_config(vault)?;
-    if config.retention.archived_drafts_days < 1 {
-        return Err(format!(
-            "Invalid retention.archived_drafts_days: {}",
-            config.retention.archived_drafts_days
-        )
-        .into());
-    }
-    Ok(config.retention.archived_drafts_days)
 }
 
 pub(crate) fn allowed_tags(vault: &Path) -> Result<Vec<String>> {
@@ -201,7 +182,6 @@ pub(crate) fn compile(vault: &Path) -> Result<CompileSummary> {
         "source": "0_core/config/configs.yaml",
         "profile": profile,
         "index": config.index,
-        "retention": config.retention,
         "semantic": config.semantic,
         "tags": {"allowed": tags},
         "rooms": rooms,
@@ -224,14 +204,6 @@ fn validate_and_flatten(config: &Config) -> Result<Vec<CompiledRoom>> {
     require(
         !config.profile.is_empty(),
         "profile must be a non-empty string",
-    )?;
-    require(
-        config.retention.archived_drafts_days >= 1,
-        "retention.archived_drafts_days must be a positive number",
-    )?;
-    require(
-        config.retention.default_mode.as_deref().unwrap_or("report") == "report",
-        "retention.default_mode must be report for MVP",
     )?;
     require(
         !config.tags.allowed.is_empty(),

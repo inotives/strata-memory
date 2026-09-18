@@ -21,7 +21,7 @@ const REQUIRED_DIRS: &[&str] = &[
     "2_knowledge",
     "3_intelligence",
 ];
-const VALID_STATUSES: &[&str] = &["pending", "verified", "archived", "generated", "core"];
+const VALID_STATUSES: &[&str] = &["pending", "verified", "generated", "core"];
 
 #[derive(Debug)]
 struct Check {
