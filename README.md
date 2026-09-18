@@ -100,6 +100,12 @@ Run a first search:
 strata search --query "example" --vault ~/.strata-memory
 ```
 
+Confirm the installed engine release:
+
+```bash
+strata version
+```
+
 Useful installer options:
 
 ```bash
@@ -118,6 +124,7 @@ git fetch origin
 git switch main
 git pull --ff-only
 ./install.sh --vault "$HOME/.strata-memory"
+"$HOME/.strata-memory/0_core/bin/strata" version
 "$HOME/.strata-memory/0_core/bin/strata" doctor --vault "$HOME/.strata-memory"
 ```
 
@@ -125,11 +132,21 @@ This rebuilds the release binary and derived index while preserving your
 Markdown and `0_core/config/configs.yaml`. It does not edit shell profiles or
 require manually copying a binary.
 
+## Release
+
+Strata uses Semantic Versioning. Increment the patch version for compatible
+fixes, the minor version for compatible features, and the major version for
+intentional breaking changes. For each release, update `Cargo.toml` and
+`CHANGELOG.md`, run the validation commands, commit, create an annotated
+`vX.Y.Z` tag, then push the branch and tag. A GitHub Release may be published
+afterward, but is not required.
+
 ## Common Commands
 
 | Command | Purpose |
 |---|---|
 | `strata init --vault PATH [--json]` | Create the vault directory layout. |
+| `strata version [--json]` | Report the installed Strata engine release. |
 | `strata db-migrate --vault PATH [--json]` | Create or update the active index backend schema. |
 | `strata refresh --vault PATH [--json]` | Rebuild the active index from Markdown. |
 | `strata config-compile --vault PATH [--json]` | Validate config and write `0_core/cache/config.compiled.json`. |

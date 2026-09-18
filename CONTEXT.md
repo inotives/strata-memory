@@ -20,6 +20,10 @@ _Avoid_: Database migration, backend migration
 Installation-time preparation that makes a vault's rebuildable search infrastructure ready for use.
 _Avoid_: Installation, setup
 
+**Strata release version**:
+The SemVer identifier embedded in the distributed `strata` binary. It identifies the engine release installed into a vault, not a document revision or an index schema migration.
+_Avoid_: Document version, migration version
+
 **Index database**:
 The rebuildable local database file owned by an index backend.
 _Avoid_: Turso database, primary database, source of truth

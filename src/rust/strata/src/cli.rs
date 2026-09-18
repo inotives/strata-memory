@@ -11,6 +11,7 @@ pub(crate) struct Cli {
 
 #[derive(Debug)]
 pub(crate) enum Command {
+    Version,
     AgentsGenerate,
     Index(IndexMode),
     Refresh,
@@ -72,6 +73,15 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
     let command = iter.next().ok_or("missing command")?;
 
     let parsed_command = match command.as_str() {
+        "version" => {
+            while let Some(arg) = iter.next() {
+                match arg.as_str() {
+                    "--json" => json = true,
+                    other => return Err(format!("unknown argument: {other}").into()),
+                }
+            }
+            Command::Version
+        }
         "agents-generate" => {
             while let Some(arg) = iter.next() {
                 match arg.as_str() {
@@ -370,6 +380,7 @@ pub(crate) fn parse_args(args: Vec<String>) -> Result<Cli> {
 }
 
 fn print_usage() {
+    println!("Usage: strata version [--json]");
     println!("Usage: strata index [--target FILE | --full] [--vault PATH] [--json]");
     println!("       strata refresh [--vault PATH] [--json]");
     println!("       strata agents-generate [--vault PATH] [--json]");

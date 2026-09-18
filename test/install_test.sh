@@ -30,7 +30,12 @@ assert_single_line() {
     [ "$(printf '%s\n' "$1" | wc -l | tr -d ' ')" = 1 ] || fail "expected one line"
 }
 
-"${ROOT}/install.sh" --vault "$VAULT" >/dev/null
+EXPECTED_VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' "${ROOT}/src/rust/strata/Cargo.toml")
+INSTALL_OUTPUT=$("${ROOT}/install.sh" --vault "$VAULT")
+case "$INSTALL_OUTPUT" in
+    *"Installed version: ${EXPECTED_VERSION}"*) ;;
+    *) fail "expected installer version output" ;;
+esac
 
 assert_dir "${VAULT}/0_core/script/lib"
 assert_dir "${VAULT}/0_core/bin"
@@ -86,7 +91,7 @@ JSON_OUTPUT=$("${ROOT}/install.sh" --vault "$JSON_VAULT" --json)
 rm -rf "$JSON_VAULT"
 assert_single_line "$JSON_OUTPUT"
 case "$JSON_OUTPUT" in
-    '{"ok":true,"vault":'*',"manifest":'*'}') ;;
+    '{"ok":true,"vault":'*',"manifest":'*',"version":"'"${EXPECTED_VERSION}"'"}') ;;
     *) fail "expected installer JSON output" ;;
 esac
 
